@@ -1,0 +1,33 @@
+# Compiled Object files and other temp files
+*.slo
+*.lo
+*.o
+/*.obj
+*.ilk
+*.lib
+*.exp
+
+# Debug symbols
+*.pdb
+*.dSYM
+
+# Codelite
+.codelite
+*.mk
+Debug
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Executables
+*.exe
+*.out
+*.app
+bin/*
+
+# Icon must end with two \r
+Icon
+
+# Thumbnails
+._*
