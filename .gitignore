@@ -32,5 +32,7 @@ Icon
 # Thumbnails
 ._*
 
-# Mac libs
-libs/mac/
+# not Mac libs
+libs/mac
+!libs/win/*
+libs/bullet_full/mac/*.a
