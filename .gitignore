@@ -31,3 +31,6 @@ Icon
 
 # Thumbnails
 ._*
+
+# Mac libs
+libs/mac/
