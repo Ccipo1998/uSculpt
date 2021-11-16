@@ -14,7 +14,7 @@ Universita' degli Studi di Milano
 
 */
 
-#version 410 core
+#version 460 core
 
 const float PI = 3.14159265359;
 
@@ -28,10 +28,13 @@ in vec3 vNormal;
 // vector from fragment to camera (in view coordinate)
 in vec3 vViewPosition;
 
+in vec2 textCoords;
+
 // ambient, diffusive and specular components (passed from the application)
 uniform vec3 ambientColor;
 uniform vec3 diffuseColor;
 uniform vec3 specularColor;
+uniform sampler2D SightTex;
 // weight of the components
 // in this case, we can pass separate values from the main application even if Ka+Kd+Ks>1. In more "realistic" situations, I have to set this sum = 1, or at least Kd+Ks = 1, by passing Kd as uniform, and then setting Ks = 1.0-Kd
 uniform float Ka;
@@ -118,6 +121,9 @@ vec3 Phong() // this name is the one which is detected by the SetupShaders() fun
 subroutine(ill_model)
 vec3 BlinnPhong() // this name is the one which is detected by the SetupShaders() function in the main application, and the one used to swap subroutines
 {
+    // TODO: prova texture
+    vec3 texColor = texture(SightTex, textCoords).rgb;
+
     // ambient component can be calculated at the beginning
     vec3 color = Ka*ambientColor;
 
@@ -236,7 +242,8 @@ void main(void)
 {
     // we call the pointer function Illumination_Model():
     // the subroutine selected in the main application will be called and executed
-  	vec3 color = Illumination_Model(); 
+  	vec3 color = Illumination_Model();
+    //vec3 color = texture(SightTex, textCoords).rgb;   
   
     colorFrag = vec4(color, 1.0);
 }

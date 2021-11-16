@@ -45,6 +45,11 @@ struct Vertex {
     glm::vec3 Bitangent;
 };
 
+enum RenderingType {
+    TRIANGLES,
+    LINES
+};
+
 /////////////////// MESH class ///////////////////////
 class Mesh {
 public:
@@ -53,7 +58,7 @@ public:
     vector<GLuint> indices;
     // VAO
     GLuint VAO;
-
+    
     // We want Mesh to be a move-only class. We delete copy constructor and copy assignment
     // see:
     // https://docs.microsoft.com/en-us/cpp/cpp/constructors-cpp?view=vs-2019
@@ -127,12 +132,17 @@ public:
     //////////////////////////////////////////
 
     // rendering of mesh
-    void Draw()
+    void Draw(RenderingType rendering_type = TRIANGLES)
     {
         // VAO is made "active"
         glBindVertexArray(this->VAO);
         // rendering of data in the VAO
-        glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        
+        if (rendering_type == TRIANGLES)
+            glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        else if (rendering_type == LINES)
+            glDrawElements(GL_LINES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        
         // VAO is "detached"
         glBindVertexArray(0);
     }

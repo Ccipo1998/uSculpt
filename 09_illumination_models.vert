@@ -13,7 +13,7 @@ Universita' degli Studi di Milano
 
 */
 
-#version 410 core
+#version 460 core
 
 // vertex position in world coordinates
 layout (location = 0) in vec3 position;
@@ -21,6 +21,7 @@ layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 normal;
 // the numbers used for the location in the layout qualifier are the positions of the vertex attribute
 // as defined in the Mesh class
+layout (location = 2) in vec2 TextCoords;
 
 // model matrix
 uniform mat4 modelMatrix;
@@ -47,6 +48,7 @@ out vec3 vNormal;
 // to do this, we need to calculate in the vertex shader the view direction (in view coordinates) for each vertex, and to have it interpolated for each fragment by the rasterization stage
 out vec3 vViewPosition;
 
+out vec2 textCoords;
 
 void main(){
 
@@ -63,6 +65,8 @@ void main(){
   // light incidence direction (in view coordinate)
   vec4 lightPos = viewMatrix  * vec4(pointLightPosition, 1.0);
   lightDir = lightPos.xyz - mvPosition.xyz;
+
+  textCoords = TextCoords;
 
   // we apply the projection transformation
   gl_Position = projectionMatrix * mvPosition;

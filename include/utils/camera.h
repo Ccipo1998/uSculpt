@@ -18,6 +18,13 @@ Universita' degli Studi di Milano
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+// ray struct
+struct Ray3 {
+    glm::vec3 origin;
+    glm::vec3 direction;
+    float lenght;
+};
+
 // possible camera movements
 enum Camera_Movement {
     FORWARD,
@@ -112,6 +119,16 @@ public:
 
         // the camera reference system is updated using the new camera rotations
         this->updateCameraVectors();
+    }
+
+    Ray3 CameraRay(float u, float v, float lenght) 
+    {
+        Ray3 ray = Ray3 { this->Position, glm::vec3(0.0f, 0.0f, 0.0f), lenght };
+        glm::vec3 dir = glm::normalize(this->Right * (u - 0.5f) + (this->Up * (v - 0.5f) + this->Front));
+        //dir = glm::normalize(dir - this->Position);
+        ray.direction = dir;
+
+        return ray;
     }
 
 private:

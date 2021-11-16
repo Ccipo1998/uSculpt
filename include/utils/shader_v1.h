@@ -84,9 +84,9 @@ public:
         checkCompileErrors(fragment, "FRAGMENT");
 
         // Step 3: Shader Program creation
-        this->Program = glCreateProgram();
-        glAttachShader(this->Program, vertex);
-        glAttachShader(this->Program, fragment);
+        this->Program = glCreateProgram(); // create the program object
+        glAttachShader(this->Program, vertex); // attach the shader to the program object
+        glAttachShader(this->Program, fragment); // attach the shader to the program object
         glLinkProgram(this->Program);
         // check linking errors
         checkCompileErrors(this->Program, "PROGRAM");
