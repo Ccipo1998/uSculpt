@@ -121,14 +121,79 @@ public:
         this->updateCameraVectors();
     }
 
-    Ray3 CameraRay(float u, float v, float lenght) 
+    Ray3 CameraRay(float u, float v, float lenght, float aspectRatio) 
     {
+        float fov = 45.0f;
+
+        u = u * 2 - 1.0f;
+        v = 1.0f - v * 2;
+
+        u = u * aspectRatio * glm::tan(fov / 2);
+        v = v * glm::tan(fov / 2);
+
+        return Ray3 {this->Position, glm::normalize(glm::vec3(u, v, this->Front.z)), lenght};
+
+        /*
         Ray3 ray = Ray3 { this->Position, glm::vec3(0.0f, 0.0f, 0.0f), lenght };
-        glm::vec3 dir = glm::normalize(this->Right * (u - 0.5f) + (this->Up * (v - 0.5f) + this->Front));
-        //dir = glm::normalize(dir - this->Position);
-        ray.direction = dir;
+        glm::vec3 q = glm::normalize((this->Right * (u * 2 - 1.0f) * aspectRatio) + (this->Up * -(v * 2 - 1.0f) * aspectRatio) - this->Front);
+        //glm::vec3 dir = glm::normalize(q - this->Position);
+        ray.direction = q;
+        //cout << "u: " << u << "; v: " << v << endl;
+        //cout << dir.x << " " << dir.y << " " << dir.z << endl;
+        //cout << this->Right.x << " " << this->Right.y << " " << this->Right.z << endl;
+        //cout << this->Front.x << " " << this->Front.y << " " << this->Front.z << endl;
 
         return ray;
+        */
+    }
+
+    Ray3 CameraRay(float u, float v, float lenght, glm::mat4 projection, glm::mat4 view) 
+    {
+
+        glm::mat4 inverse = glm::inverse(projection * view);
+
+        u = u * 2.0f - 1.0f;
+        v = 1.0f - v * 2;
+
+        glm::vec4 in = glm::vec4(u, v, this->Front.z, 1.0f);
+
+        glm::vec4 out = inverse * in;
+        out.w = 1.0f / out.w;
+        out.x *= out.w;
+        out.y *= out.w;
+        out.z *= out.w;
+        
+        Ray3 ray = Ray3 {this->Position, glm::normalize(glm::vec3(out.x, out.y, out.z) - this->Position), lenght};
+
+        return ray;
+
+        /*
+        u = u * 2.0f - 1.0f;
+        v = 1.0f - v * 2;
+        glm::vec4 in = glm::vec4(u, v, -1.0f, 1.0f);
+        glm::vec4 ray_eye = glm::inverse(projection) * in;
+        ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
+
+        glm::vec4 world = glm::inverse(view) * ray_eye;
+
+        glm::vec3 dir = glm::normalize(glm::vec3(world.x, world.y, world.z));
+
+        return Ray3 {this->Position, dir, lenght};
+        */
+    }
+
+    Ray3 CameraRay(double cameraX, double cameraY, int cameraWidth, int cameraHeight, glm::mat4 projection, glm::mat4 view) {
+        float x = (2.0f * cameraX) / cameraWidth - 1.0f;
+        float y = 1.0f - (2.0f * cameraY) / cameraHeight;
+
+        glm::vec4 ray_clip = glm::vec4(x, y, -1.0f, 1.0f);
+        glm::vec4 ray_eye = glm::inverse(projection) * ray_clip;
+        ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
+
+        glm::vec4 ray_world4 = glm::inverse(view) * ray_eye;
+        glm::vec3 ray_world3 = glm::normalize(glm::vec3(ray_world4.x, ray_world4.y, ray_world4.x));
+
+        return Ray3 { this->Position, ray_world3, 100.0f };
     }
 
 private:

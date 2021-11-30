@@ -47,7 +47,8 @@ struct Vertex {
 
 enum RenderingType {
     TRIANGLES,
-    LINES
+    LINES,
+    POINTS
 };
 
 /////////////////// MESH class ///////////////////////
@@ -142,6 +143,8 @@ public:
             glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
         else if (rendering_type == LINES)
             glDrawElements(GL_LINES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        else if (rendering_type == POINTS)
+            glDrawElements(GL_POINTS, this->indices.size(), GL_UNSIGNED_INT, 0);
         
         // VAO is "detached"
         glBindVertexArray(0);

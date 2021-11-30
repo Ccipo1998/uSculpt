@@ -42,7 +42,7 @@
 #include <stb_image/stb_image.h>
 
 // windows' dimensions
-GLuint screenWidth = 1000, screenHeight = 600;
+GLuint screenWidth = 800, screenHeight = 600;
 
 // callback functions for keyboard and mouse events (events handle for user commands)
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -160,7 +160,8 @@ int main()
     glClearColor(0.26f, 0.46f, 0.98f, 1.0f);
 
     // the choose Shader Program for the objects used in the application
-    Shader object_shader = Shader("09_illumination_models.vert", "10_illumination_models.frag");
+    //Shader object_shader = Shader("09_illumination_models.vert", "10_illumination_models.frag", "intersection.geom");
+    Shader object_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
 
     /* TODO: qui deve esserci la creazione di un mesh standard iniziale, che poi cambiato dall'utente, scegliendo un mesh di input
 
@@ -227,16 +228,20 @@ int main()
         
     // Projection matrix: FOV angle, aspect ratio, near and far planes
     projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 10000.0f);
-
     // Model and Normal transformation matrices for the objects in the scene: we set to identity
     glm::mat4 objModelMatrix = glm::mat4(1.0f);
     glm::mat3 objNormalMatrix = glm::mat3(1.0f);
     glm::mat4 planeModelMatrix = glm::mat4(1.0f);
     glm::mat3 planeNormalMatrix = glm::mat3(1.0f);
 
-    Ray3 camera_ray = camera.CameraRay((GLfloat) 800 / screenWidth, (GLfloat) 500 / screenHeight, 5000.0f);
-    Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin, glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { glm::normalize(camera_ray.direction - camera_ray.origin) * camera_ray.lenght, glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
+    view = camera.GetViewMatrix();
+    Ray3 camera_ray = camera.CameraRay((GLfloat) (500.0f / width), (GLfloat) (40.0f / height), 5000.0f, projection, view);
+    //Ray3 camera_ray = camera.CameraRay((GLfloat) 0 / width, (GLfloat) 0 / height, 5000.0f);
+    Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin, glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { camera_ray.origin + camera_ray.direction, glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
     
+    //Ray3 camera_ray = camera.CameraRay((GLfloat) ((500 + 0.5f) / width), (GLfloat) ((300 + 0.5f) / height), 5000.0f, (float)screenWidth/(float)screenHeight);
+    //Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin, glm::vec3(1.0f, 0.0f, 0.0f)}, Vertex { camera_ray.direction * camera_ray.lenght, glm::vec3(1.0f, 0.0f, 0.0f)}, Vertex { (glm::normalize(camera_ray.direction - camera_ray.origin) * camera_ray.lenght) + glm::vec3(1.0f, 1.0f, 1.0f) * camera_ray.lenght, glm::vec3(1.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1, 2});
+
     //Ray3 camera_ray = camera.CameraRay((GLfloat) cursorX / screenWidth, (GLfloat) cursorY / screenHeight, 5000.0f);
     //Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin - glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { - ((camera_ray.origin + glm::vec3(1.0f, 0.0f, 0.0f)) * camera_ray.lenght), glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
 
@@ -268,9 +273,11 @@ int main()
         else
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        //camera_ray = camera.CameraRay((GLfloat) cursorX / screenWidth, (GLfloat) cursorY / screenHeight, 5000.0f);
+        camera_ray = camera.CameraRay((GLfloat) cursorX / width, (GLfloat) cursorY / height, 5000.0f, projection, view); // SOLUZIONE PIU VICINA
+        // camera_ray = camera.CameraRay(cursorX, cursorY, width, height, projection, view);
         //Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin, glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { glm::normalize(camera_ray.direction - camera_ray.origin) * camera_ray.lenght, glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
         //cout << camera_ray.direction.x << endl;
+        
         /////////////////// OBJECTS ////////////////////////////////////////////////
         // We "install" the selected Shader Program as part of the current rendering process
         object_shader.Use();
@@ -290,11 +297,19 @@ int main()
         GLint alphaLocation = glGetUniformLocation(object_shader.Program, "alpha");
         GLint f0Location = glGetUniformLocation(object_shader.Program, "F0");
 
+        // we assign uniform variable for camera ray
+        GLint rayOriginLocation = glGetUniformLocation(object_shader.Program, "rayOrigin");
+        GLint rayDirLocation = glGetUniformLocation(object_shader.Program, "rayDir");
+
         // we assign the value to the uniform variable
         glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPos0));
         glUniform1f(kdLocation, Kd);
         glUniform1f(alphaLocation, alpha);
         glUniform1f(f0Location, F0);
+        glm::vec4 origin = glm::vec4(camera_ray.origin.x, camera_ray.origin.y, camera_ray.origin.z, 1.0f);
+        glm::vec4 direction = glm::vec4(camera_ray.direction.x, camera_ray.direction.y, camera_ray.direction.z, 1.0f);
+        glUniform3fv(rayOriginLocation, 1, glm::value_ptr(glm::vec3(origin.x, origin.y, origin.z)));
+        glUniform3fv(rayDirLocation, 1, glm::value_ptr(glm::vec3(direction.x, direction.y, direction.z)));
 
         /////
         // STATIC PLANE
