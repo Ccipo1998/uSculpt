@@ -7,7 +7,7 @@ Geometry Shader to compute the intersection between camera_ray and each triangle
 // input primitive type
 layout (triangles) in;
 // output type and vertex count per-output-primitive
-layout (triangle_strip, max_vertices = 3) out;
+layout (triangle_strip, max_vertices = 4) out;
 
 // uniform camera_ray input -> those are transformed in camera coordinates before they were passed here (in appl stage)
 uniform vec3 rayOrigin;
@@ -34,6 +34,10 @@ in VS_OUT {
 } gs_in[];
 
 // it is possible to use vertex data from the built-in variable gl_in, which is the previously setted gl_position variable (so in camera coordinates)
+
+// TRANSFORM FEEDBACK
+out vec3 interPoint;
+// END TRANSFORM FEEDBACK
 
 vec3 RayPlaneIntersection(vec3 pNormal) {
     /* i can compute the intersection between the ray and the triangle plane: (Ax + By + Cz + D = 0) -> plane equation where A, B and C are the x,y,z coordinates of plane normal vector
@@ -156,7 +160,10 @@ void main() {
         hitColor = vec3(0.0, 0.0, 0.0); // black
         P = vec3(0.0, 0.0, 0.0);
     }
-    
+
+    // write intersection point
+    interPoint = P;
+
     // at last we need to send data to the fragment shader
     gl_Position = gl_in[0].gl_Position;
     lightDir = gs_in[0].lightDir;
@@ -179,8 +186,10 @@ void main() {
     textCoords = gs_in[2].textCoords;
     EmitVertex();
 
-    //gl_Position = vec4(P, 1.0);
-    //EmitVertex();
+    if (P != vec3(0.0, 0.0, 0.0)) {
+        gl_Position = vec4(P, 1.0);
+        EmitVertex();   
+    }
 
     EndPrimitive();
 }

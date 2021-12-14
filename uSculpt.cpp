@@ -161,7 +161,7 @@ int main()
 
     // the choose Shader Program for the objects used in the application
     //Shader object_shader = Shader("09_illumination_models.vert", "10_illumination_models.frag", "intersection.geom");
-    Shader object_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
+    Shader object_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom", INTERSECTION);
 
     /* TODO: qui deve esserci la creazione di un mesh standard iniziale, che poi cambiato dall'utente, scegliendo un mesh di input
 
@@ -245,6 +245,16 @@ int main()
     //Ray3 camera_ray = camera.CameraRay((GLfloat) cursorX / screenWidth, (GLfloat) cursorY / screenHeight, 5000.0f);
     //Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin - glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { - ((camera_ray.origin + glm::vec3(1.0f, 0.0f, 0.0f)) * camera_ray.lenght), glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
 
+    // TRANSFORM FEEDBACK
+    float interPoint[3];
+    GLuint tbo;
+    glGenBuffers(1, &tbo);
+    glBindBuffer(GL_ARRAY_BUFFER, tbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(interPoint), nullptr, GL_STATIC_READ);
+
+    // To actually bind the buffer we've created above as transform feedback buffer, we have to use the next function
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo);
+    // END TRANSFORM FEEDBACK
 
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
@@ -311,6 +321,21 @@ int main()
         glUniform3fv(rayOriginLocation, 1, glm::value_ptr(glm::vec3(origin.x, origin.y, origin.z)));
         glUniform3fv(rayDirLocation, 1, glm::value_ptr(glm::vec3(direction.x, direction.y, direction.z)));
 
+        /*
+        // we create the Shader Storage Buffer Object to send data between CPU and GPU
+        // object of the ssbo
+        GLuint ssbo;
+        glGenBuffers(1, &ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(intersectionPoint), &intersectionPoint, GL_DYNAMIC_COPY); //sizeof(data) only works for statically sized C/C++ arrays.
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+        
+        GLuint block_index = 0;
+        block_index = glGetProgramResourceIndex(object_shader.Program, GL_SHADER_STORAGE_BLOCK, "intersectionPoint");
+        GLuint ssbo_binding_point_index = 3;
+        glShaderStorageBlockBinding(object_shader.Program, block_index, ssbo_binding_point_index);
+        */
+
         /////
         // STATIC PLANE
         // we use a specific color for the plane
@@ -327,9 +352,30 @@ int main()
         glUniformMatrix3fv(glGetUniformLocation(object_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
 
         // we render the model
+        // we enable the transform feedback
+        glBeginTransformFeedback(GL_TRIANGLES);
         model.Draw();
-        planeModelMatrix = glm::mat4(1.0f);
-        mesh.Draw(LINES);
+        glEndTransformFeedback();
+
+        // We still want to make sure the rendering operation has finished before trying to access the results
+        glFlush();
+
+        glm::vec3* feedback = new glm::vec3[model.meshes[0].vertices.size()];
+        glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, 0, sizeof(feedback), feedback);
+        for (int i = 0; i < (model.meshes[0].vertices.size()); i++) {
+            if (feedback[i].x != 0.0f || feedback[i].y != 0.0f || feedback[i].z != 0.0f);
+                //cout << "x:" << feedback[i].x << ", y:" << feedback[i].y << ", z:" << feedback[i].z << " - ";
+        }
+        //cout << endl;
+        //planeModelMatrix = glm::mat4(1.0f);
+        //mesh.Draw(LINES);
+
+        /*
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float) * 3, &intersectionPoint); //to update partially
+        cout << intersectionPoint[0] << endl;
+        cout << intersectionPoint[1] << endl;
+        cout << intersectionPoint[2] << endl;
+        */
         /////
         // DYNAMIC OBJECTS (FALLING CUBES + BULLETS)
         /////
