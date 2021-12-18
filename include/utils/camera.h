@@ -17,6 +17,7 @@ Universita' degli Studi di Milano
 // we use GLM to create the view matrix and to manage camera transformations
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <utils/intersection.h>
 
 // possible camera movements
 enum Camera_Movement {
@@ -54,16 +55,26 @@ public:
     // Camera options
     GLfloat MovementSpeed;
     GLfloat MouseSensitivity;
+    // Parameters to calculate Projection Matrix
+    GLfloat Fov;
+    GLuint ScreenWidth;
+    GLuint ScreenHeight;
+    GLfloat NearPlane;
+    GLfloat FarPlane;
+    // Camera Ray parameter
+    Ray3 CameraRay;
 
     //////////////////////////////////////////
     // simplified constructor
     // it can be extended passing different values of speed and mouse sensitivity, etc...
-    Camera(glm::vec3 position, GLboolean onGround)
-        :Position(position),onGround(onGround),Yaw(YAW),Pitch(PITCH),MovementSpeed(SPEED),MouseSensitivity(SENSITIVITY)
+    Camera(glm::vec3 position, GLboolean onGround, GLfloat fov, GLuint screenWidth, GLuint screenHeight, GLfloat near, GLfloat far)
+        :Position(position),onGround(onGround),Yaw(YAW),Pitch(PITCH),MovementSpeed(SPEED),MouseSensitivity(SENSITIVITY),Fov(fov),ScreenWidth(screenWidth),ScreenHeight(screenHeight),NearPlane(near),FarPlane(far)
     {
         this->WorldUp = glm::vec3(0.0f,1.0f,0.0f);
         // initialization of the camera reference system
         this->updateCameraVectors();
+        // camera ray is initialized with the position of the camera and front direction
+        this->CameraRay = Ray3 { this->Position, this->Front };
     }
 
     //////////////////////////////////////////
@@ -71,6 +82,13 @@ public:
     glm::mat4 GetViewMatrix()
     {
         return glm::lookAt(this->Position, this->Position + this->Front, this->Up);
+    }
+
+    //////////////////////////////////////////
+    // it returns the current projection matrix
+    glm::mat4 GetProjectionMatrix()
+    {
+        return glm::perspective(this->Fov, (float)this->ScreenWidth / (float)this->ScreenHeight, this->NearPlane, this->FarPlane);
     }
 
     //////////////////////////////////////////
@@ -112,6 +130,35 @@ public:
 
         // the camera reference system is updated using the new camera rotations
         this->updateCameraVectors();
+    }
+
+    //////////////////////////////////////////
+    // it updates the camera ray
+    void UpdateCameraRay(GLfloat mouseX, GLfloat mouseY)
+    {
+        // we need the inverse matrix to pass from screen space to world space
+        glm::mat4 projection = this->GetProjectionMatrix();
+        glm::mat4 view = this->GetViewMatrix();
+
+        glm::mat4 inverse = glm::inverse(projection * view);
+
+        // from screen space to normalized device space in [-1, 1] on u and v
+        float u = mouseX / (float)this->ScreenWidth;
+        float v = mouseY / (float)this->ScreenHeight;
+        u = u * 2.0f - 1.0f;
+        v = 1.0f - v * 2;
+
+        // from normalized device space to homogeneus clip space -> eye space -> world space
+        glm::vec4 in = glm::vec4(u, v, 1.0f, 1.0f);
+        glm::vec4 out = inverse * in;
+        // perspective division
+        out.w = 1.0f / out.w;
+        out.x *= out.w;
+        out.y *= out.w;
+        out.z *= out.w;
+
+        this->CameraRay.origin = this->Position;
+        this->CameraRay.direction = glm::normalize(glm::vec3(out.x, out.y, out.z) - this->CameraRay.origin);
     }
 
 private:

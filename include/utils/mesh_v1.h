@@ -45,6 +45,9 @@ struct Vertex {
     glm::vec3 Bitangent;
 };
 
+// enum type for different types of rendering
+enum RenderingType { TRIANGLES, LINES };
+
 /////////////////// MESH class ///////////////////////
 class Mesh {
 public:
@@ -127,12 +130,15 @@ public:
     //////////////////////////////////////////
 
     // rendering of mesh
-    void Draw()
+    void Draw(RenderingType renderingType = TRIANGLES)
     {
         // VAO is made "active"
         glBindVertexArray(this->VAO);
         // rendering of data in the VAO
-        glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        if (renderingType == TRIANGLES)
+            glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        else if (renderingType == LINES)
+            glDrawElements(GL_LINES, this->indices.size(), GL_UNSIGNED_INT, 0);
         // VAO is "detached"
         glBindVertexArray(0);
     }

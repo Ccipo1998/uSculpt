@@ -28,6 +28,9 @@
 #include <utils/model_v1.h>
 #include <utils/camera.h>
 
+// intersection library
+#include <utils/intersection.h>
+
 // glm is a robust library to manage matrix and vector operations (with matrix and vector classes ready-to-use) -> use glm namespace!
 // it is not recommended to include all the glm headers with "using namespace glm" -> it can lead to many namespace clashes
 // glm support passing a glm-type to OpenGL with glm::value_ptr(glm object)
@@ -72,7 +75,7 @@ GLboolean wireframe = GL_FALSE;
 glm::mat4 view, projection;
 
 // we create a camera. We pass the initial position as a parameter to the constructor. In this case, we use a "floating" camera (we pass false as last parameter)
-Camera camera(glm::vec3(0.0f, 0.0f, 2.5f), GL_FALSE); // andrea: posizione della camera in modo che il modello sia a 0,0,0
+Camera camera(glm::vec3(0.0f, 0.0f, 2.5f), GL_FALSE, 45.0f, screenWidth, screenHeight, 1.0f, 1000.0f); // andrea: posizione della camera in modo che il modello sia a 0,0,0
 
 // Uniforms to be passed to shaders
 // point light position
@@ -209,14 +212,23 @@ int main()
     }
     */
 
-    // Projection matrix: FOV angle, aspect ratio, near and far planes
-    projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 10000.0f);
+    // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
+    projection = camera.GetProjectionMatrix();
 
     // Model and Normal transformation matrices for the objects in the scene: we set to identity
     glm::mat4 objModelMatrix = glm::mat4(1.0f);
     glm::mat3 objNormalMatrix = glm::mat3(1.0f);
     glm::mat4 planeModelMatrix = glm::mat4(1.0f);
     glm::mat3 planeNormalMatrix = glm::mat3(1.0f);
+
+    // camera ray mesh creation for debug rendering
+    glm::vec3 fixedRayOrigin = camera.CameraRay.origin;
+    camera.UpdateCameraRay(500, 300);
+    Mesh ray(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { camera.CameraRay.origin + camera.CameraRay.direction * 1000.0f, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
+    // mesh ray intersection for debugging
+    Intersection intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
+    // for debugging: ray build using intersected point
+    ray = Mesh(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
 
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
@@ -244,6 +256,12 @@ int main()
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         else
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        // Mouse ray update
+        camera.UpdateCameraRay(lastX, lastY);
+        intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
+        // for debugging: ray build using intersected point
+        ray = Mesh(vector<Vertex> { Vertex { fixedRayOrigin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
 
         /////////////////// OBJECTS ////////////////////////////////////////////////
         // We "install" the selected Shader Program as part of the current rendering process
@@ -286,7 +304,8 @@ int main()
         // andrea: we render the model
         model.Draw();
         planeModelMatrix = glm::mat4(1.0f);
-
+        // rendering the camera ray for debugging
+        ray.Draw(LINES);
         /////
         // DYNAMIC OBJECTS (FALLING CUBES + BULLETS)
         /////
