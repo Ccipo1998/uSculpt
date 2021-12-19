@@ -222,7 +222,7 @@ int main()
     glm::mat3 planeNormalMatrix = glm::mat3(1.0f);
 
     // camera ray mesh creation for debug rendering
-    glm::vec3 fixedRayOrigin = camera.CameraRay.origin;
+    // glm::vec3 fixedRayOrigin = camera.CameraRay.origin;
     camera.UpdateCameraRay(500, 300);
     Mesh ray(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { camera.CameraRay.origin + camera.CameraRay.direction * 1000.0f, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
     // mesh ray intersection for debugging
@@ -259,9 +259,16 @@ int main()
 
         // Mouse ray update
         camera.UpdateCameraRay(lastX, lastY);
+        // intersection update with new camera ray
         intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
-        // for debugging: ray build using intersected point
-        ray = Mesh(vector<Vertex> { Vertex { fixedRayOrigin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
+        // ray build using intersected point
+        ray = Mesh(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
+        // send intersection point on the mesh to the Shader Program
+        GLint interPointLocation = glGetUniformLocation(object_shader.Program, "interPoint");
+        glUniform3fv(interPointLocation, 1, glm::value_ptr(intersection.point));
+        // send intersection primitive for visualization and check to the Shader Program
+        GLint interPrimitiveLocation = glGetUniformLocation(object_shader.Program, "interPrimitive");
+        glUniform1i(interPrimitiveLocation, intersection.primitiveIndex);
 
         /////////////////// OBJECTS ////////////////////////////////////////////////
         // We "install" the selected Shader Program as part of the current rendering process
@@ -407,6 +414,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastY = ypos;
 
     // we pass the offset to the Camera class instance in order to update the rendering
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    //camera.ProcessMouseMovement(xoffset, yoffset);
 
 }

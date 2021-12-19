@@ -36,6 +36,10 @@ uniform mat3 normalMatrix;
 // N. B.) with more lights, and of different kinds, the shader code must be modified with a for cycle, with different treatment of the source lights parameters (directions, position, cutoff angle for spot lights, etc)
 uniform vec3 pointLightPosition;
 
+// intersection point and primitive between camera ray and mesh
+uniform vec3 interPoint;
+uniform int interPrimitive;
+
 // light incidence direction (in view coordinates)
 out vec3 lightDir;
 // the transformed normal (in view coordinate) is set as an output variable, to be "passed" to the fragment shader
@@ -63,6 +67,17 @@ void main(){
   // light incidence direction (in view coordinate)
   vec4 lightPos = viewMatrix  * vec4(pointLightPosition, 1.0);
   lightDir = lightPos.xyz - mvPosition.xyz;
+
+  // before compute new position, we need to add the gaussian brush
+  // the intersection point needs to be transormed in view coordinates
+  if (interPrimitive != -1)
+  {
+    vec4 vinterPoint = viewMatrix * modelMatrix * vec4(interPoint, 1.0);
+    // check if the current vertex is inside the brush with selected radius (FOR NOW THERE ARE DEBUGGING VALUES)
+    if (length(mvPosition.xyz - vinterPoint.xyz) < 0.3 ) {
+      mvPosition = mvPosition + vec4(vNormal, 1.0) * 0.1;
+    }
+  }
 
   // we apply the projection transformation
   gl_Position = projectionMatrix * mvPosition;
