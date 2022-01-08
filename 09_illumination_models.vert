@@ -19,6 +19,9 @@ Universita' degli Studi di Milano
 layout (location = 0) in vec3 position;
 // vertex normal in world coordinate
 layout (location = 1) in vec3 normal;
+layout (location = 2) in vec2 texcoords;
+layout (location = 3) in vec3 tangent;
+layout (location = 4) in vec3 bitangent;
 // the numbers used for the location in the layout qualifier are the positions of the vertex attribute
 // as defined in the Mesh class
 
@@ -40,6 +43,19 @@ uniform vec3 pointLightPosition;
 uniform vec3 interPoint;
 uniform int interPrimitive;
 
+// Transform Feedback parameters using "buffer ping-ponging technique"
+
+// Render pass
+uniform int stage;
+
+// Output to transform feedback buffers (pass 1)
+out vec3 newPosition;
+out vec3 newNormal;
+out vec2 newTexCoords;
+out vec3 newTangent;
+out vec3 newBitangent;
+
+// Output to fragment shader (pass 2)
 // light incidence direction (in view coordinates)
 out vec3 lightDir;
 // the transformed normal (in view coordinate) is set as an output variable, to be "passed" to the fragment shader
@@ -50,10 +66,39 @@ out vec3 vNormal;
 // we need to calculate also the reflection vector for each fragment
 // to do this, we need to calculate in the vertex shader the view direction (in view coordinates) for each vertex, and to have it interpolated for each fragment by the rasterization stage
 out vec3 vViewPosition;
+// Output to fragment shader end
 
+// Transform Feedback parameters end
 
-void main(){
+// Transform Feedback functions
 
+void UniformBrush()
+{
+  // here we work in world coordinates
+  if (interPrimitive != -1 && length(position - interPoint) < 0.3)
+  {
+    // we have the intersection and the current vertex is inside the radius of the stroke
+    newPosition = position + normal * 0.1;
+  }
+  else
+  {
+    // the new position is the same as the previous
+    newPosition = position;
+  }
+
+  //newPosition = position + normal * 0.1;
+  newNormal = normal;
+  newTexCoords = texcoords;
+  newTangent = tangent;
+  newBitangent = bitangent;
+}
+
+// Transform Feedback functions end
+
+// Rendering functions
+
+void Render()
+{
   // vertex position in ModelView coordinate (see the last line for the application of projection)
   // when I need to use coordinates in camera coordinates, I need to split the application of model and view transformations from the projection transformations
   vec4 mvPosition = viewMatrix * modelMatrix * vec4( position, 1.0 );
@@ -68,18 +113,16 @@ void main(){
   vec4 lightPos = viewMatrix  * vec4(pointLightPosition, 1.0);
   lightDir = lightPos.xyz - mvPosition.xyz;
 
-  // before compute new position, we need to add the gaussian brush
-  // the intersection point needs to be transormed in view coordinates
-  if (interPrimitive != -1)
-  {
-    vec4 vinterPoint = viewMatrix * modelMatrix * vec4(interPoint, 1.0);
-    // check if the current vertex is inside the brush with selected radius (FOR NOW THERE ARE DEBUGGING VALUES)
-    if (length(mvPosition.xyz - vinterPoint.xyz) < 0.3 ) {
-      mvPosition = mvPosition + vec4(vNormal, 1.0) * 0.1;
-    }
-  }
-
   // we apply the projection transformation
   gl_Position = projectionMatrix * mvPosition;
+}
 
+// Rendering functions end
+
+void main(){
+  // call the right function basing on the current stage
+  if (stage == 1)
+    UniformBrush();
+  else
+    Render();
 }

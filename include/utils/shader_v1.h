@@ -87,6 +87,11 @@ public:
         this->Program = glCreateProgram();
         glAttachShader(this->Program, vertex);
         glAttachShader(this->Program, fragment);
+
+        // just before linking the shader, the relationship between buffers and shader output variables is defined
+        const char* outputNames[] = { "newPosition", "newNormal", "newTexCoords", "newTangent", "newBitangent" };
+        glTransformFeedbackVaryings(this->Program, 5, outputNames, GL_INTERLEAVED_ATTRIBS);
+
         glLinkProgram(this->Program);
         // check linking errors
         checkCompileErrors(this->Program, "PROGRAM");

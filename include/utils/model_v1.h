@@ -76,10 +76,16 @@ public:
     //////////////////////////////////////////
 
     // model rendering: calls rendering methods of each instance of Mesh class in the vector
-    void Draw()
+    void Draw(GLuint buffer, RenderingType renderingType = TRIANGLES)
     {
         for(GLuint i = 0; i < this->meshes.size(); i++)
-            this->meshes[i].Draw();
+            this->meshes[i].Draw(buffer, renderingType);
+    }
+
+    void Draw(RenderingType renderingType = TRIANGLES)
+    {
+        for(GLuint i = 0; i < this->meshes.size(); i++)
+            this->meshes[i].Draw(renderingType);
     }
 
     //////////////////////////////////////////

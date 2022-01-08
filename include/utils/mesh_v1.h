@@ -130,6 +130,19 @@ public:
     //////////////////////////////////////////
 
     // rendering of mesh
+    void Draw(GLuint buffer, RenderingType renderingType = TRIANGLES)
+    {
+        // VAO is made "active"
+        glBindVertexArray(buffer);
+        // rendering of data in the VAO
+        if (renderingType == TRIANGLES)
+            glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        else if (renderingType == LINES)
+            glDrawElements(GL_LINES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        // VAO is "detached"
+        glBindVertexArray(0);
+    }
+
     void Draw(RenderingType renderingType = TRIANGLES)
     {
         // VAO is made "active"

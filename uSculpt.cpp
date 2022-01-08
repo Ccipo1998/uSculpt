@@ -42,7 +42,7 @@
 // we include the library for images loading
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
-
+#include <thread>
 // Dimensioni della finestra dell'applicazione
 GLuint screenWidth = 1000, screenHeight = 600;
 
@@ -229,6 +229,111 @@ int main()
     Intersection intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
     // for debugging: ray build using intersected point
     ray = Mesh(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
+/*
+    // Transform Feedback using "ping-ponging technique"
+    // setting up objects
+    GLuint feedback[2]; // Transform Feedback objects
+    GLuint vertexBuf[2]; // Vertex buffers objects (VBOs) (A and B)
+    // create and allocate buffers A and B for vertexBuf
+    glGenBuffers(1, &vertexBuf[0]);
+    glGenBuffers(1, &vertexBuf[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[0]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * model.meshes[0].vertices.size(), &model.meshes[0].vertices[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * model.meshes[0].vertices.size(), &model.meshes[0].vertices[0], GL_STATIC_DRAW);
+    // Setup the feedback objects
+    glGenTransformFeedbacks(2, feedback);
+    // Transform Feedback 0
+    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[0]);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[0]);
+    // Transform Feedback 1
+    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[1]);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[1]);
+    // swap buffer index
+    */
+    GLuint EBO;
+    GLuint VAOs[2], feedback[2], vertexBuf[2];
+    
+    glGenVertexArrays(1, &VAOs[0]);
+    glGenBuffers(1, &feedback[0]);
+    glGenBuffers(1, &vertexBuf[0]);
+    glGenBuffers(1, &EBO);
+
+    // VAO is made "active"
+    glBindVertexArray(VAOs[0]);
+    // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[0]);
+    glBufferData(GL_ARRAY_BUFFER, model.meshes[0].vertices.size() * sizeof(Vertex), &model.meshes[0].vertices[0], GL_STREAM_DRAW);
+    // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, model.meshes[0].indices.size() * sizeof(GLuint), &model.meshes[0].indices[0], GL_STREAM_DRAW);
+
+    // Setup the feedback objects
+    glGenTransformFeedbacks(2, feedback);
+    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[0]);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[0]);
+
+    // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
+    // vertex positions
+    // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+    // Normals
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
+    // Texture Coordinates
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
+    // Tangent
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
+    // Bitangent
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
+
+    glBindVertexArray(0);
+
+
+
+
+    glGenVertexArrays(1, &VAOs[1]);
+    glGenBuffers(1, &feedback[1]);
+    glGenBuffers(1, &vertexBuf[1]);
+    glGenBuffers(1, &EBO);
+
+    // VAO is made "active"
+    glBindVertexArray(VAOs[1]);
+    // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[1]);
+    glBufferData(GL_ARRAY_BUFFER, model.meshes[0].vertices.size() * sizeof(Vertex), 0, GL_STREAM_DRAW);
+    // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, model.meshes[0].indices.size() * sizeof(GLuint), &model.meshes[0].indices[0], GL_STREAM_DRAW);
+
+    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[1]);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[1]);
+
+    // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
+    // vertex positions
+    // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+    // Normals
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
+    // Texture Coordinates
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
+    // Tangent
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
+    // Bitangent
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
+
+    glBindVertexArray(0);
+
+    int drawBuf = 1;
 
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
@@ -257,19 +362,6 @@ int main()
         else
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        // Mouse ray update
-        camera.UpdateCameraRay(lastX, lastY);
-        // intersection update with new camera ray
-        intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
-        // ray build using intersected point
-        ray = Mesh(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
-        // send intersection point on the mesh to the Shader Program
-        GLint interPointLocation = glGetUniformLocation(object_shader.Program, "interPoint");
-        glUniform3fv(interPointLocation, 1, glm::value_ptr(intersection.point));
-        // send intersection primitive for visualization and check to the Shader Program
-        GLint interPrimitiveLocation = glGetUniformLocation(object_shader.Program, "interPrimitive");
-        glUniform1i(interPrimitiveLocation, intersection.primitiveIndex);
-
         /////////////////// OBJECTS ////////////////////////////////////////////////
         // We "install" the selected Shader Program as part of the current rendering process
         object_shader.Use();
@@ -277,6 +369,17 @@ int main()
         GLuint index = glGetSubroutineIndex(object_shader.Program, GL_FRAGMENT_SHADER, "GGX");
         // we activate the subroutine using the index
         glUniformSubroutinesuiv( GL_FRAGMENT_SHADER, 1, &index);
+
+        // Mouse ray update
+        camera.UpdateCameraRay(lastX, lastY);
+        // intersection update with new camera ray
+        intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
+        // ray build using intersected point
+        ray = Mesh(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
+        // send intersection point on the mesh to the Shader Program
+        glUniform3fv(glGetUniformLocation(object_shader.Program, "interPoint"), 1, glm::value_ptr(intersection.point));
+        // send intersection primitive for visualization and check to the Shader Program
+        glUniform1i(glGetUniformLocation(object_shader.Program, "interPrimitive"), intersection.primitiveIndex);
 
         // we pass projection and view matrices to the Shader Program
         glUniformMatrix4fv(glGetUniformLocation(object_shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
@@ -308,11 +411,33 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(object_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
         glUniformMatrix3fv(glGetUniformLocation(object_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
 
+        /////
+        // TRANSFORM FEEDBACK START
+
+        // Brush stage
+        glUniform1i(glGetUniformLocation(object_shader.Program, "stage"), 1);
+        glEnable(GL_RASTERIZER_DISCARD); // disabling the rasterization during brush stage
+        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[drawBuf]); // We set the target buffer of transform feedback computations
+        glBeginTransformFeedback(GL_POINTS); // TODO: provare GL_TRIANGLES
+        //model.Draw(VAOs[1 - drawBuf]); // while we are applying the brush, we use the two vertexBuf
+        glBindVertexArray(VAOs[1 - drawBuf]);
+        glDrawArrays(GL_POINTS, 0, model.meshes[0].vertices.size());
+        glBindVertexArray(0);
+        //model.Draw(VAOs[1 - drawBuf]);
+        glEndTransformFeedback();
+        glDisable(GL_RASTERIZER_DISCARD);
+        // Render stage
+        glUniform1i(glGetUniformLocation(object_shader.Program, "stage"), 2);
+        model.Draw(VAOs[drawBuf]);
+
+        // swap buffers
+        drawBuf = 1 - drawBuf;
+
         // andrea: we render the model
-        model.Draw();
+        //model.Draw();
         planeModelMatrix = glm::mat4(1.0f);
         // rendering the camera ray for debugging
-        ray.Draw(LINES);
+        //ray.Draw(LINES);
         /////
         // DYNAMIC OBJECTS (FALLING CUBES + BULLETS)
         /////
