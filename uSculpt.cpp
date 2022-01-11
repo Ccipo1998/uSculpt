@@ -49,6 +49,7 @@ GLuint screenWidth = 1000, screenHeight = 600;
 // callback functions for keyboard and mouse events
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_key_callback(GLFWwindow* window, int button, int action, int mods);
 // if one of the WASD keys is pressed, we call the corresponding method of the Camera class
 void apply_camera_movements();
 
@@ -56,7 +57,7 @@ void apply_camera_movements();
 bool keys[1024];
 
 // we set the initial position of mouse cursor in the application window
-GLfloat lastX = 500.0f, lastY = 300.0f;
+GLfloat lastX = 0.0f, lastY = 0.0f;
 
 // we will use these value to "pass" the cursor position to the keyboard callback, in order to determine the bullet trajectory
 double cursorX,cursorY;
@@ -75,7 +76,7 @@ GLboolean wireframe = GL_FALSE;
 glm::mat4 view, projection;
 
 // we create a camera. We pass the initial position as a parameter to the constructor. In this case, we use a "floating" camera (we pass false as last parameter)
-Camera camera(glm::vec3(0.0f, 0.0f, 2.5f), GL_FALSE, 45.0f, screenWidth, screenHeight, 1.0f, 1000.0f); // andrea: posizione della camera in modo che il modello sia a 0,0,0
+Camera camera(glm::vec3(0.0f, 0.0f, 2.5f), GL_FALSE, 45.0f, screenWidth, screenHeight, 1.0f, 1000.0f); // camera position such as the model is at position (0, 0, 0)
 
 // Uniforms to be passed to shaders
 // point light position
@@ -91,9 +92,12 @@ GLfloat F0 = 0.9f;
 // color of the falling objects
 GLfloat diffuseColor[] = {1.0f,0.0f,0.0f};
 // color of the plane
-GLfloat planeMaterial[] = {0.0f,0.5f,0.0f};
+GLfloat planeMaterial[] = {0.8f,0.39f,0.1f};
 // color of the bullets
 GLfloat shootColor[] = {1.0f,1.0f,0.0f};
+
+// brush flag (mouse callback)
+bool brush = false;
 
 ////////////////// MAIN function ///////////////////////
 int main()
@@ -125,6 +129,7 @@ int main()
     // we put in relation the window and the callbacks
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mouse_key_callback);
 
     // we disable the mouse cursor
     //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -153,7 +158,7 @@ int main()
     // we define the viewport dimensions
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    // andrea: forse qui è da considerare la barra delle impostazioni, da eliminare nella dimensione della viewport rispetto alla dimensione della finestra
+    // TODO: forse qui è da considerare la barra delle impostazioni, da eliminare nella dimensione della viewport rispetto alla dimensione della finestra
     glViewport(0, 0, width, height);
 
     // we enable Z test
@@ -163,17 +168,14 @@ int main()
     glClearColor(0.26f, 0.46f, 0.98f, 1.0f);
 
     // the Shader Program for the objects used in the application
-    Shader object_shader = Shader("09_illumination_models.vert", "10_illumination_models.frag");
+    Shader object_shader = Shader("Shader_Brushing.vert", "Shader_Standard.frag");
 
-    /* andrea: qui deve esserci la creazione di un mesh standard iniziale, che poi cambiato dall'utente, scegliendo un mesh di input
-
-    */
     // load of an initial standard sphere mesh
     Model model("models/sphere.obj");
     //Model model("models/sphere.obj");
     // we need to set the mesh in a cube of 1x1x1 dimensions, so we will have consistency with the sculpting params
-    // andrea: FUNZIONE PER CIRCOSCRIVERE IL MESH IN UN CUBO 1x1x1
-    // the mesh is static, so i set the position as static
+    // TODO: funzione per circoscrivere il mesh in un cubo 1x1x1
+    // initial mesh position and size
     glm::vec3 model_pos = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 model_size = glm::vec3(1.0f, 1.0f, 1.0f);
     /*
@@ -229,109 +231,10 @@ int main()
     Intersection intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
     // for debugging: ray build using intersected point
     ray = Mesh(vector<Vertex> { Vertex { camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) }, Vertex { intersection.primitiveIndex != -1 ? intersection.point : camera.CameraRay.origin, glm::vec3(0.0f, 0.0f, 0.0f) } }, vector<GLuint> { 0, 1 });
-/*
-    // Transform Feedback using "ping-ponging technique"
-    // setting up objects
-    GLuint feedback[2]; // Transform Feedback objects
-    GLuint vertexBuf[2]; // Vertex buffers objects (VBOs) (A and B)
-    // create and allocate buffers A and B for vertexBuf
-    glGenBuffers(1, &vertexBuf[0]);
-    glGenBuffers(1, &vertexBuf[1]);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * model.meshes[0].vertices.size(), &model.meshes[0].vertices[0], GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[1]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * model.meshes[0].vertices.size(), &model.meshes[0].vertices[0], GL_STATIC_DRAW);
-    // Setup the feedback objects
-    glGenTransformFeedbacks(2, feedback);
-    // Transform Feedback 0
-    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[0]);
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[0]);
-    // Transform Feedback 1
-    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[1]);
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[1]);
-    // swap buffer index
-    */
-    GLuint EBO;
-    GLuint VAOs[2], feedback[2], vertexBuf[2];
-    
-    glGenVertexArrays(1, &VAOs[0]);
-    glGenBuffers(1, &feedback[0]);
-    glGenBuffers(1, &vertexBuf[0]);
-    glGenBuffers(1, &EBO);
 
-    // VAO is made "active"
-    glBindVertexArray(VAOs[0]);
-    // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[0]);
-    glBufferData(GL_ARRAY_BUFFER, model.meshes[0].vertices.size() * sizeof(Vertex), &model.meshes[0].vertices[0], GL_STREAM_DRAW);
-    // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, model.meshes[0].indices.size() * sizeof(GLuint), &model.meshes[0].indices[0], GL_STREAM_DRAW);
-
-    // Setup the feedback objects
-    glGenTransformFeedbacks(2, feedback);
-    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[0]);
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[0]);
-
-    // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
-    // vertex positions
-    // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
-    // Normals
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
-    // Texture Coordinates
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
-    // Tangent
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
-    // Bitangent
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
-
-    glBindVertexArray(0);
-
-
-
-
-    glGenVertexArrays(1, &VAOs[1]);
-    glGenBuffers(1, &feedback[1]);
-    glGenBuffers(1, &vertexBuf[1]);
-    glGenBuffers(1, &EBO);
-
-    // VAO is made "active"
-    glBindVertexArray(VAOs[1]);
-    // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuf[1]);
-    glBufferData(GL_ARRAY_BUFFER, model.meshes[0].vertices.size() * sizeof(Vertex), 0, GL_STREAM_DRAW);
-    // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, model.meshes[0].indices.size() * sizeof(GLuint), &model.meshes[0].indices[0], GL_STREAM_DRAW);
-
-    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[1]);
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, vertexBuf[1]);
-
-    // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
-    // vertex positions
-    // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
-    // Normals
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
-    // Texture Coordinates
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
-    // Tangent
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
-    // Bitangent
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
-
-    glBindVertexArray(0);
+    GLuint VAOs[2], feedback[2], vertices[2];
+    //Vertex* newVertices[2];
+    model.meshes[0].InitMeshUpdate(VAOs, feedback, vertices);
 
     int drawBuf = 1;
 
@@ -405,36 +308,65 @@ int main()
 
         planeModelMatrix = glm::mat4(1.0f);
         planeNormalMatrix = glm::mat3(1.0f);
-        planeModelMatrix = glm::translate(planeModelMatrix, model_pos); // andrea: posizione del modello
-        planeModelMatrix = glm::scale(planeModelMatrix, model_size); // andrea: size modello (da capire se questo basta per inscriverlo nel cubo 1x1x1)
+        planeModelMatrix = glm::translate(planeModelMatrix, model_pos); // model position
+        planeModelMatrix = glm::scale(planeModelMatrix, model_size); // model size
         planeNormalMatrix = glm::inverseTranspose(glm::mat3(view*planeModelMatrix));
         glUniformMatrix4fv(glGetUniformLocation(object_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
         glUniformMatrix3fv(glGetUniformLocation(object_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
 
-        /////
-        // TRANSFORM FEEDBACK START
+        // TODO: abilitare il brushing solo mentre il tasto del mouse è premuto
+        if (brush)
+        {
+            /////
+            // TRANSFORM FEEDBACK START
 
-        // Brush stage
-        glUniform1i(glGetUniformLocation(object_shader.Program, "stage"), 1);
-        glEnable(GL_RASTERIZER_DISCARD); // disabling the rasterization during brush stage
-        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[drawBuf]); // We set the target buffer of transform feedback computations
-        glBeginTransformFeedback(GL_POINTS); // TODO: provare GL_TRIANGLES
-        //model.Draw(VAOs[1 - drawBuf]); // while we are applying the brush, we use the two vertexBuf
-        glBindVertexArray(VAOs[1 - drawBuf]);
-        glDrawArrays(GL_POINTS, 0, model.meshes[0].vertices.size());
-        glBindVertexArray(0);
-        //model.Draw(VAOs[1 - drawBuf]);
-        glEndTransformFeedback();
-        glDisable(GL_RASTERIZER_DISCARD);
-        // Render stage
-        glUniform1i(glGetUniformLocation(object_shader.Program, "stage"), 2);
-        model.Draw(VAOs[drawBuf]);
+            // Brush stage
+            // setting the brush stage in the vertex shader
+            glUniform1i(glGetUniformLocation(object_shader.Program, "stage"), 1);
+            // disabling the rasterization during brush stage
+            glEnable(GL_RASTERIZER_DISCARD);
+            // setting the target buffer of transform feedback computations
+            glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[drawBuf]);
 
-        // swap buffers
-        drawBuf = 1 - drawBuf;
+            glBeginTransformFeedback(GL_POINTS);
+            glBindVertexArray(VAOs[1 - drawBuf]);
+            glDrawArrays(GL_POINTS, 0, model.meshes[0].vertices.size()); // drawing vertices like points to call the vertex shader only once per-vertex
+            glBindVertexArray(0);
+            glEndTransformFeedback();
+            glDisable(GL_RASTERIZER_DISCARD);
 
-        // andrea: we render the model
-        //model.Draw();
+            // Render stage
+            // setting the render stage in the vertex shader
+            glUniform1i(glGetUniformLocation(object_shader.Program, "stage"), 2);
+            model.Draw(VAOs[drawBuf]);
+
+            // swap buffers for ping ponging
+            drawBuf = 1 - drawBuf;
+
+            // TRANSFORM FEEDBACK END
+            /////
+
+            // TODO: questo codice ogni tanto crasha, capire il perché -> da qui
+            // updating model geometry cpu-side for next camera_ray-model intersection test
+            glBindBuffer(GL_ARRAY_BUFFER, vertices[drawBuf]);
+            Vertex* newVertices = (Vertex*) glMapBufferRange(GL_ARRAY_BUFFER, 0, model.meshes[0].vertices.size(), GL_MAP_READ_BIT);
+            //Vertex* newVertices = (Vertex*) glMapBuffer(GL_ARRAY_BUFFER, GL_MAP_READ_BIT);
+            if (newVertices != nullptr)
+            {
+                for (int i = 0; i < model.meshes[0].vertices.size(); i++)
+                {
+                    model.meshes[0].vertices[i] = newVertices[i];
+                }
+                glUnmapBuffer(GL_ARRAY_BUFFER);
+            }
+            // -> a qui
+        }
+        else
+        {
+            // else i simply draw the model from the last computed buffer <- the drawBuf variable is not updated here
+            model.Draw(VAOs[drawBuf]);
+        }
+
         planeModelMatrix = glm::mat4(1.0f);
         // rendering the camera ray for debugging
         //ray.Draw(LINES);
@@ -541,4 +473,14 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     // we pass the offset to the Camera class instance in order to update the rendering
     //camera.ProcessMouseMovement(xoffset, yoffset);
 
+}
+
+//////////////////////////////////////////
+// callback for mouse key inputs
+void mouse_key_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        brush = true;
+    else
+        brush = false;
 }

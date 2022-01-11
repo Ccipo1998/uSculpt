@@ -42,6 +42,7 @@ uniform vec3 pointLightPosition;
 // intersection point and primitive between camera ray and mesh
 uniform vec3 interPoint;
 uniform int interPrimitive;
+// TODO: passare la normale al punto di intersezione per utilizzarla nel brush
 
 // Transform Feedback parameters using "buffer ping-ponging technique"
 
@@ -71,6 +72,8 @@ out vec3 vViewPosition;
 // Transform Feedback parameters end
 
 // Transform Feedback functions
+
+// TODO: gaussian brush
 
 void UniformBrush()
 {
