@@ -1,6 +1,8 @@
 
 // Std. Includes
 #include <string>
+#include <stdlib.h>
+#include <iomanip>
 
 // Loader estensioni OpenGL
 // http://glad.dav1d.de/
@@ -42,7 +44,6 @@
 // we include the library for images loading
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
-#include <thread>
 // Dimensioni della finestra dell'applicazione
 GLuint screenWidth = 1000, screenHeight = 600;
 
@@ -76,7 +77,7 @@ GLboolean wireframe = GL_FALSE;
 glm::mat4 view, projection;
 
 // we create a camera. We pass the initial position as a parameter to the constructor. In this case, we use a "floating" camera (we pass false as last parameter)
-Camera camera(glm::vec3(0.0f, 0.0f, 2.5f), GL_FALSE, 45.0f, screenWidth, screenHeight, 1.0f, 1000.0f); // camera position such as the model is at position (0, 0, 0)
+Camera camera(glm::vec3(0.0f, 0.0f, 1.5f), GL_FALSE, 45.0f, screenWidth, screenHeight, 1.0f, 1000.0f); // camera position such as the model is at position (0, 0, 0)
 
 // Uniforms to be passed to shaders
 // point light position
@@ -172,12 +173,10 @@ int main()
 
     // load of an initial standard sphere mesh
     Model model("models/sphere.obj");
-    //Model model("models/sphere.obj");
-    // we need to set the mesh in a cube of 1x1x1 dimensions, so we will have consistency with the sculpting params
-    // TODO: funzione per circoscrivere il mesh in un cubo 1x1x1
-    // initial mesh position and size
+
+    // initial mesh position and scale factor
     glm::vec3 model_pos = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 model_size = glm::vec3(1.0f, 1.0f, 1.0f);
+    glm::vec3 model_scale = glm::vec3(1.0f, 1.0f, 1.0f);
     /*
     // we load the model(s) (code of Model class is in include/utils/model_v2.h)
     Model cubeModel("../../models/cube.obj");
@@ -238,6 +237,9 @@ int main()
 
     int drawBuf = 1;
 
+    // fps counter
+    int fps = 0;
+
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
     {
@@ -246,6 +248,10 @@ int main()
         GLfloat currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+
+        // update fps counter
+        fps = (int) 1 / deltaTime;
+        cout << '\r' << std::setw(2) << "FPS: " << fps << std::flush;
 
         // Check is an I/O event is happening
         glfwPollEvents();
@@ -309,7 +315,7 @@ int main()
         planeModelMatrix = glm::mat4(1.0f);
         planeNormalMatrix = glm::mat3(1.0f);
         planeModelMatrix = glm::translate(planeModelMatrix, model_pos); // model position
-        planeModelMatrix = glm::scale(planeModelMatrix, model_size); // model size
+        planeModelMatrix = glm::scale(planeModelMatrix, model_scale); // new model size
         planeNormalMatrix = glm::inverseTranspose(glm::mat3(view*planeModelMatrix));
         glUniformMatrix4fv(glGetUniformLocation(object_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
         glUniformMatrix3fv(glGetUniformLocation(object_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
