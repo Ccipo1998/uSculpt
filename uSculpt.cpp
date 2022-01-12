@@ -161,7 +161,7 @@ int main()
 
     // the choose Shader Program for the objects used in the application
     //Shader object_shader = Shader("09_illumination_models.vert", "10_illumination_models.frag", "intersection.geom");
-    Shader object_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom", INTERSECTION);
+    Shader object_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
 
     /* TODO: qui deve esserci la creazione di un mesh standard iniziale, che poi cambiato dall'utente, scegliendo un mesh di input
 
@@ -352,20 +352,7 @@ int main()
         glUniformMatrix3fv(glGetUniformLocation(object_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
 
         // we render the model
-        // we enable the transform feedback
-        glBeginTransformFeedback(GL_TRIANGLES);
         model.Draw();
-        glEndTransformFeedback();
-
-        // We still want to make sure the rendering operation has finished before trying to access the results
-        glFlush();
-
-        glm::vec3* feedback = new glm::vec3[model.meshes[0].vertices.size()];
-        glGetBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, 0, sizeof(feedback), feedback);
-        for (int i = 0; i < (model.meshes[0].vertices.size()); i++) {
-            if (feedback[i].x != 0.0f || feedback[i].y != 0.0f || feedback[i].z != 0.0f);
-                //cout << "x:" << feedback[i].x << ", y:" << feedback[i].y << ", z:" << feedback[i].z << " - ";
-        }
         //cout << endl;
         //planeModelMatrix = glm::mat4(1.0f);
         //mesh.Draw(LINES);

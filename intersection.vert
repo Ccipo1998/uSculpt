@@ -51,6 +51,7 @@ uniform vec3 pointLightPosition;
 //out vec2 textCoords;
 
 out VS_OUT {
+  vec3 position;
   vec3 lightDir;
   vec3 vNormal;
   vec3 vViewPosition;
@@ -74,6 +75,9 @@ void main(){
   vs_out.lightDir = lightPos.xyz - mvPosition.xyz;
 
   vs_out.textCoords = TextCoords;
+
+  // sending the vertex position in world coordinates to geometry shader for intersection test
+  vs_out.position = position;
 
   // we apply the projection transformation
   gl_Position = projectionMatrix * mvPosition;

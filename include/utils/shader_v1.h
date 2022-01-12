@@ -103,7 +103,7 @@ public:
     }
 
     //constructor
-    Shader(const GLchar* vertexPath, const GLchar* fragmentPath, const GLchar* geometryPath, ShaderType shaderType = RENDERING)
+    Shader(const GLchar* vertexPath, const GLchar* fragmentPath, const GLchar* geometryPath)
     {
         // Step 1: we retrieve shaders source code from provided filepaths
         string vertexCode;
@@ -176,12 +176,6 @@ public:
         glAttachShader(this->Program, vertex); // attach the shader to the program object
         glAttachShader(this->Program, fragment); // attach the shader to the program object
         glAttachShader(this->Program, geometry); // attach the shader to the program object
-
-        // before linking, we have to tell OpenGL which output attributes we want to capture into a buffer in case of shaderType == INTERSECTION
-        if (shaderType == INTERSECTION) {
-            const GLchar* feedbackVaryings[] = { "interPoint" };
-            glTransformFeedbackVaryings(this->Program, 1, feedbackVaryings, GL_INTERLEAVED_ATTRIBS);
-        }
 
         // linking shaders
         glLinkProgram(this->Program);
