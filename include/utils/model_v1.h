@@ -76,10 +76,16 @@ public:
     //////////////////////////////////////////
 
     // model rendering: calls rendering methods of each instance of Mesh class in the vector
-    void Draw()
+    void Draw(GLuint buffer, RenderingType renderingType = TRIANGLES)
     {
         for(GLuint i = 0; i < this->meshes.size(); i++)
-            this->meshes[i].Draw();
+            this->meshes[i].Draw(buffer, renderingType);
+    }
+
+    void Draw(RenderingType renderingType = TRIANGLES)
+    {
+        for(GLuint i = 0; i < this->meshes.size(); i++)
+            this->meshes[i].Draw(renderingType);
     }
 
     //////////////////////////////////////////
@@ -146,6 +152,9 @@ private:
         vector<Vertex> vertices;
         vector<GLuint> indices;
 
+        // scale factor for inscription in a cube of 1x1x1
+        float scale_factor = this->InCube1x1x1(mesh);
+
         for(GLuint i = 0; i < mesh->mNumVertices; i++)
         {
             Vertex vertex;
@@ -153,9 +162,9 @@ private:
             // I need to convert the data structures (from Assimp to GLM, which are fully compatible to the OpenGL)
             glm::vec3 vector;
             // vertices coordinates
-            vector.x = mesh->mVertices[i].x;
-            vector.y = mesh->mVertices[i].y;
-            vector.z = mesh->mVertices[i].z;
+            vector.x = mesh->mVertices[i].x * scale_factor;
+            vector.y = mesh->mVertices[i].y * scale_factor;
+            vector.z = mesh->mVertices[i].z * scale_factor;
             vertex.Position = vector;
             // Normals
             vector.x = mesh->mNormals[i].x;
@@ -202,5 +211,33 @@ private:
 
         // we return an instance of the Mesh class created using the vertices and faces data structures we have created above.
         return Mesh(vertices, indices);
+    }
+
+    // setting the mesh in a cube of 1x1x1 dimensions, for consistency with the sculpting params
+    float InCube1x1x1(aiMesh* mesh)
+    {
+        float maxX = numeric_limits<float>::min();
+        float maxY = numeric_limits<float>::min();
+        float maxZ = numeric_limits<float>::min();
+        float minX = numeric_limits<float>::max();
+        float minY = numeric_limits<float>::max();
+        float minZ = numeric_limits<float>::max();
+        for (int i = 0; i < mesh->mNumVertices; i++)
+        {
+            aiVector3D v = mesh->mVertices[i];
+            if (v.x > maxX) maxX = v.x;
+            if (v.y > maxY) maxY = v.y;
+            if (v.z > maxZ) maxZ = v.z;
+
+            if (v.x < minX) minX = v.x;
+            if (v.y < minY) minY = v.y;
+            if (v.z < minZ) minZ = v.z;
+        }
+        float extensionX = abs(maxX) + abs(minX);
+        float extensionY = abs(maxY) + abs(minY);
+        float extensionZ = abs(maxZ) + abs(minZ);
+        float maxExtension = max({extensionX, extensionY, extensionZ});
+
+        return 1 / maxExtension;
     }
 };

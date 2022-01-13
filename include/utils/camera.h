@@ -17,13 +17,7 @@ Universita' degli Studi di Milano
 // we use GLM to create the view matrix and to manage camera transformations
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
-// ray struct
-struct Ray3 {
-    glm::vec3 origin;
-    glm::vec3 direction;
-    float lenght;
-};
+#include <utils/intersection.h>
 
 // possible camera movements
 enum Camera_Movement {
@@ -61,16 +55,26 @@ public:
     // Camera options
     GLfloat MovementSpeed;
     GLfloat MouseSensitivity;
+    // Parameters to calculate Projection Matrix
+    GLfloat Fov;
+    GLuint ScreenWidth;
+    GLuint ScreenHeight;
+    GLfloat NearPlane;
+    GLfloat FarPlane;
+    // Camera Ray parameter
+    Ray3 CameraRay;
 
     //////////////////////////////////////////
     // simplified constructor
     // it can be extended passing different values of speed and mouse sensitivity, etc...
-    Camera(glm::vec3 position, GLboolean onGround)
-        :Position(position),onGround(onGround),Yaw(YAW),Pitch(PITCH),MovementSpeed(SPEED),MouseSensitivity(SENSITIVITY)
+    Camera(glm::vec3 position, GLboolean onGround, GLfloat fov, GLuint screenWidth, GLuint screenHeight, GLfloat near, GLfloat far)
+        :Position(position),onGround(onGround),Yaw(YAW),Pitch(PITCH),MovementSpeed(SPEED),MouseSensitivity(SENSITIVITY),Fov(fov),ScreenWidth(screenWidth),ScreenHeight(screenHeight),NearPlane(near),FarPlane(far)
     {
         this->WorldUp = glm::vec3(0.0f,1.0f,0.0f);
         // initialization of the camera reference system
         this->updateCameraVectors();
+        // camera ray is initialized with the position of the camera and front direction
+        this->CameraRay = Ray3 { this->Position, this->Front };
     }
 
     //////////////////////////////////////////
@@ -78,6 +82,13 @@ public:
     glm::mat4 GetViewMatrix()
     {
         return glm::lookAt(this->Position, this->Position + this->Front, this->Up);
+    }
+
+    //////////////////////////////////////////
+    // it returns the current projection matrix
+    glm::mat4 GetProjectionMatrix()
+    {
+        return glm::perspective(this->Fov, (float)this->ScreenWidth / (float)this->ScreenHeight, this->NearPlane, this->FarPlane);
     }
 
     //////////////////////////////////////////
@@ -121,79 +132,33 @@ public:
         this->updateCameraVectors();
     }
 
-    Ray3 CameraRay(float u, float v, float lenght, float aspectRatio) 
+    //////////////////////////////////////////
+    // it updates the camera ray
+    void UpdateCameraRay(GLfloat mouseX, GLfloat mouseY)
     {
-        float fov = 45.0f;
-
-        u = u * 2 - 1.0f;
-        v = 1.0f - v * 2;
-
-        u = u * aspectRatio * glm::tan(fov / 2);
-        v = v * glm::tan(fov / 2);
-
-        return Ray3 {this->Position, glm::normalize(glm::vec3(u, v, this->Front.z)), lenght};
-
-        /*
-        Ray3 ray = Ray3 { this->Position, glm::vec3(0.0f, 0.0f, 0.0f), lenght };
-        glm::vec3 q = glm::normalize((this->Right * (u * 2 - 1.0f) * aspectRatio) + (this->Up * -(v * 2 - 1.0f) * aspectRatio) - this->Front);
-        //glm::vec3 dir = glm::normalize(q - this->Position);
-        ray.direction = q;
-        //cout << "u: " << u << "; v: " << v << endl;
-        //cout << dir.x << " " << dir.y << " " << dir.z << endl;
-        //cout << this->Right.x << " " << this->Right.y << " " << this->Right.z << endl;
-        //cout << this->Front.x << " " << this->Front.y << " " << this->Front.z << endl;
-
-        return ray;
-        */
-    }
-
-    Ray3 CameraRay(float u, float v, float lenght, glm::mat4 projection, glm::mat4 view) 
-    {
+        // we need the inverse matrix to pass from screen space to world space
+        glm::mat4 projection = this->GetProjectionMatrix();
+        glm::mat4 view = this->GetViewMatrix();
 
         glm::mat4 inverse = glm::inverse(projection * view);
 
+        // from screen space to normalized device space in [-1, 1] on u and v
+        float u = mouseX / (float)this->ScreenWidth;
+        float v = mouseY / (float)this->ScreenHeight;
         u = u * 2.0f - 1.0f;
         v = 1.0f - v * 2;
 
-        glm::vec4 in = glm::vec4(u, v, this->Front.z, 1.0f);
-
+        // from normalized device space to homogeneus clip space -> eye space -> world space
+        glm::vec4 in = glm::vec4(u, v, 1.0f, 1.0f);
         glm::vec4 out = inverse * in;
+        // perspective division
         out.w = 1.0f / out.w;
         out.x *= out.w;
         out.y *= out.w;
         out.z *= out.w;
-        
-        Ray3 ray = Ray3 {this->Position, glm::normalize(glm::vec3(out.x, out.y, out.z) - this->Position), lenght};
 
-        return ray;
-
-        /*
-        u = u * 2.0f - 1.0f;
-        v = 1.0f - v * 2;
-        glm::vec4 in = glm::vec4(u, v, -1.0f, 1.0f);
-        glm::vec4 ray_eye = glm::inverse(projection) * in;
-        ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
-
-        glm::vec4 world = glm::inverse(view) * ray_eye;
-
-        glm::vec3 dir = glm::normalize(glm::vec3(world.x, world.y, world.z));
-
-        return Ray3 {this->Position, dir, lenght};
-        */
-    }
-
-    Ray3 CameraRay(double cameraX, double cameraY, int cameraWidth, int cameraHeight, glm::mat4 projection, glm::mat4 view) {
-        float x = (2.0f * cameraX) / cameraWidth - 1.0f;
-        float y = 1.0f - (2.0f * cameraY) / cameraHeight;
-
-        glm::vec4 ray_clip = glm::vec4(x, y, -1.0f, 1.0f);
-        glm::vec4 ray_eye = glm::inverse(projection) * ray_clip;
-        ray_eye = glm::vec4(ray_eye.x, ray_eye.y, -1.0f, 0.0f);
-
-        glm::vec4 ray_world4 = glm::inverse(view) * ray_eye;
-        glm::vec3 ray_world3 = glm::normalize(glm::vec3(ray_world4.x, ray_world4.y, ray_world4.x));
-
-        return Ray3 { this->Position, ray_world3, 100.0f };
+        this->CameraRay.origin = this->Position;
+        this->CameraRay.direction = glm::normalize(glm::vec3(out.x, out.y, out.z) - this->CameraRay.origin);
     }
 
 private:

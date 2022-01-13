@@ -45,11 +45,8 @@ struct Vertex {
     glm::vec3 Bitangent;
 };
 
-enum RenderingType {
-    TRIANGLES,
-    LINES,
-    POINTS
-};
+// enum type for different types of rendering
+enum RenderingType { TRIANGLES, LINES };
 
 /////////////////// MESH class ///////////////////////
 class Mesh {
@@ -59,7 +56,7 @@ public:
     vector<GLuint> indices;
     // VAO
     GLuint VAO;
-    
+
     // We want Mesh to be a move-only class. We delete copy constructor and copy assignment
     // see:
     // https://docs.microsoft.com/en-us/cpp/cpp/constructors-cpp?view=vs-2019
@@ -133,21 +130,132 @@ public:
     //////////////////////////////////////////
 
     // rendering of mesh
-    void Draw(RenderingType rendering_type = TRIANGLES)
+    void Draw(GLuint buffer, RenderingType renderingType = TRIANGLES)
+    {
+        // VAO is made "active"
+        glBindVertexArray(buffer);
+        // rendering of data in the VAO
+        if (renderingType == TRIANGLES)
+            glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        else if (renderingType == LINES)
+            glDrawElements(GL_LINES, this->indices.size(), GL_UNSIGNED_INT, 0);
+        // VAO is "detached"
+        glBindVertexArray(0);
+    }
+
+    void Draw(RenderingType renderingType = TRIANGLES)
     {
         // VAO is made "active"
         glBindVertexArray(this->VAO);
         // rendering of data in the VAO
-        
-        if (rendering_type == TRIANGLES)
+        if (renderingType == TRIANGLES)
             glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
-        else if (rendering_type == LINES)
+        else if (renderingType == LINES)
             glDrawElements(GL_LINES, this->indices.size(), GL_UNSIGNED_INT, 0);
-        else if (rendering_type == POINTS)
-            glDrawElements(GL_POINTS, this->indices.size(), GL_UNSIGNED_INT, 0);
-        
         // VAO is "detached"
         glBindVertexArray(0);
+    }
+
+    // we need to write on Vertex Array Objects and Transform Buffer Objects
+    void InitMeshUpdate(GLuint* VAOs, GLuint* TBOs, GLuint* VBOs)
+    {
+        GLuint EBO;
+
+        // TODO: controllare se questi passaggi per riferimento vanno bene
+        // creating new VAOs for vertex array attributes structure, new TBOs for Transform Feedback input/output, new EBO for rendering triangles and new vertexBuffers aka VBOs
+        glGenVertexArrays(1, &VAOs[0]);
+        glGenBuffers(1, &TBOs[0]);
+        glGenBuffers(1, &VBOs[0]);
+        glGenBuffers(1, &EBO);
+
+        // first VAO setup
+        glBindVertexArray(VAOs[0]);
+        // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
+        glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
+        glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_COPY);
+
+        //newVertices0 = (Vertex*) glMapBufferRange(GL_ARRAY_BUFFER, 0, this->vertices.size(), GL_MAP_READ_BIT);
+        /*
+        for (int i = 0; i < model.meshes[0].vertices.size(); i++)
+        {
+            Vertex v = newVertices[i];
+        }
+        glUnmapBuffer(GL_ARRAY_BUFFER);*/
+
+        // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_DYNAMIC_COPY);
+
+        // setup the feedback objects
+        glGenTransformFeedbacks(2, &TBOs[0]);
+
+        // setup the first link TBO1<->VBO1
+        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TBOs[0]);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, VBOs[0]);
+
+        // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
+        // vertex positions
+        // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+        // Normals
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
+        // Texture Coordinates
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
+        // Tangent
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
+        // Bitangent
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
+        // end of the first VAO
+        glBindVertexArray(0);
+
+        // creating new VAOs for vertex array attributes structure, new TBOs for Transform Feedback input/output, new EBO for rendering triangles and new vertexBuffers aka VBOs
+        glGenVertexArrays(1, &VAOs[1]);
+        glGenBuffers(1, &TBOs[1]);
+        glGenBuffers(1, &VBOs[1]);
+        glGenBuffers(1, &EBO);
+
+        // second VAO setup
+        glBindVertexArray(VAOs[1]);
+        // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
+        glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+        glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_COPY); // double copy of the data for first rendering in not-brushing stage
+
+        //newVertices1 = (Vertex*) glMapBufferRange(GL_ARRAY_BUFFER, 0, this->vertices.size(), GL_MAP_READ_BIT);
+
+        // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_DYNAMIC_COPY);
+
+        // setup the second link TBO2<->VBO2
+        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TBOs[1]);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, VBOs[1]);
+
+        // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
+        // vertex positions
+        // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
+        // Normals
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
+        // Texture Coordinates
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
+        // Tangent
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
+        // Bitangent
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
+        // end of the second VAO
+        glBindVertexArray(0);
+
+
     }
 
 private:
