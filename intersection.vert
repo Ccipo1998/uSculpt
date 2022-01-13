@@ -38,17 +38,25 @@ uniform mat3 normalMatrix;
 uniform vec3 pointLightPosition;
 
 // light incidence direction (in view coordinates)
-out vec3 lightDir;
+//out vec3 lightDir;
 // the transformed normal (in view coordinate) is set as an output variable, to be "passed" to the fragment shader
 // this means that the normal values in each vertex will be interpolated on each fragment created during rasterization between two vertices
-out vec3 vNormal;
+//out vec3 vNormal;
 
 // in the subroutines in fragment shader where specular reflection is considered, 
 // we need to calculate also the reflection vector for each fragment
 // to do this, we need to calculate in the vertex shader the view direction (in view coordinates) for each vertex, and to have it interpolated for each fragment by the rasterization stage
-out vec3 vViewPosition;
+//out vec3 vViewPosition;
 
-out vec2 textCoords;
+//out vec2 textCoords;
+
+out VS_OUT {
+  vec3 position;
+  vec3 lightDir;
+  vec3 vNormal;
+  vec3 vViewPosition;
+  vec2 textCoords;
+} vs_out;
 
 void main(){
 
@@ -57,16 +65,19 @@ void main(){
   vec4 mvPosition = viewMatrix * vec4( position, 1.0 );
   
   // view direction, negated to have vector from the vertex to the camera
-  vViewPosition = -mvPosition.xyz;
+  vs_out.vViewPosition = -mvPosition.xyz;
 
   // transformations are applied to the normal
-  vNormal = normalize( normalMatrix * normal );
+  vs_out.vNormal = normalize( normalMatrix * normal );
 
   // light incidence direction (in view coordinate)
   vec4 lightPos = viewMatrix  * vec4(pointLightPosition, 1.0);
-  lightDir = lightPos.xyz - mvPosition.xyz;
+  vs_out.lightDir = lightPos.xyz - mvPosition.xyz;
 
-  textCoords = TextCoords;
+  vs_out.textCoords = TextCoords;
+
+  // sending the vertex position in world coordinates to geometry shader for intersection test
+  vs_out.position = position;
 
   // we apply the projection transformation
   gl_Position = projectionMatrix * mvPosition;

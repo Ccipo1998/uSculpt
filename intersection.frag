@@ -30,6 +30,8 @@ in vec3 vViewPosition;
 
 in vec2 textCoords;
 
+in vec3 hitColor;
+
 // ambient, diffusive and specular components (passed from the application)
 uniform vec3 ambientColor;
 uniform vec3 diffuseColor;
@@ -242,7 +244,7 @@ void main(void)
 {
     // we call the pointer function Illumination_Model():
     // the subroutine selected in the main application will be called and executed
-  	vec3 color = Illumination_Model();
+  	vec3 color = Illumination_Model() + hitColor;
     //vec3 color = texture(SightTex, textCoords).rgb;   
   
     colorFrag = vec4(color, 1.0);

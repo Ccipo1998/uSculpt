@@ -27,6 +27,7 @@
 #include <utils/shader_v1.h>
 #include <utils/model_v1.h>
 #include <utils/camera.h>
+#include <utils/texture.h>
 
 // glm is a robust library to manage matrix and vector operations (with matrix and vector classes ready-to-use) -> use glm namespace!
 // it is not recommended to include all the glm headers with "using namespace glm" -> it can lead to many namespace clashes
@@ -40,12 +41,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 
-// Dimensioni della finestra dell'applicazione
-GLuint screenWidth = 1000, screenHeight = 600;
+// windows' dimensions
+GLuint screenWidth = 800, screenHeight = 600;
 
-// callback functions for keyboard and mouse events
+// callback functions for keyboard and mouse events (events handle for user commands)
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+
 // if one of the WASD keys is pressed, we call the corresponding method of the Camera class
 void apply_camera_movements();
 
@@ -72,7 +74,8 @@ GLboolean wireframe = GL_FALSE;
 glm::mat4 view, projection;
 
 // we create a camera. We pass the initial position as a parameter to the constructor. In this case, we use a "floating" camera (we pass false as last parameter)
-Camera camera(glm::vec3(0.0f, 0.0f, 2.5f), GL_FALSE); // andrea: posizione della camera in modo che il modello sia a 0,0,0
+// camera position in order to place the model at (0,0,0)
+Camera camera(glm::vec3(0.0f, 0.0f, 2.5f), GL_FALSE);
 
 // Uniforms to be passed to shaders
 // point light position
@@ -85,14 +88,11 @@ GLfloat alpha = 0.2f;
 // Fresnel reflectance at 0 degree (Schlik's approximation)
 GLfloat F0 = 0.9f;
 
-// color of the falling objects
-GLfloat diffuseColor[] = {1.0f,0.0f,0.0f};
 // color of the plane
-GLfloat planeMaterial[] = {0.0f,0.5f,0.0f};
-// color of the bullets
-GLfloat shootColor[] = {1.0f,1.0f,0.0f};
+GLfloat planeColor[] = {0.0f,0.5f,0.0f};
 
 ////////////////// MAIN function ///////////////////////
+// until the game loop, here we enter the application stage
 int main()
 {
     // Initialization of OpenGL context using GLFW
@@ -109,8 +109,8 @@ int main()
     // we set if the window is resizable
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-    // we create the application's window
-    GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "ysculpting", nullptr, nullptr);
+    // we create the application's window that we can use for GLFW's functions
+    GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "uSculpt", nullptr, nullptr);
     if (!window)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -119,11 +119,11 @@ int main()
     }
     glfwMakeContextCurrent(window);
 
-    // we put in relation the window and the callbacks
+    // we put in relation the window and the callbacks to handle events of user commands
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
 
-    // we disable the mouse cursor
+    // we could disable the mouse cursor
     //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // GLAD tries to load the context set by GLFW
@@ -147,10 +147,10 @@ int main()
     printf("GL Version (integer)    :%d.%d\n", major, minor);
     printf("GLSL version            :%s\n", glslversion);
 
-    // we define the viewport dimensions
+    // we define the viewport dimensions and position compared to the window
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    // andrea: forse qui è da considerare la barra delle impostazioni, da eliminare nella dimensione della viewport rispetto alla dimensione della finestra
+    // TODO: forse qui è da considerare la barra delle impostazioni, da eliminare nella dimensione della viewport rispetto alla dimensione della finestra
     glViewport(0, 0, width, height);
 
     // we enable Z test
@@ -159,20 +159,37 @@ int main()
     //the "clear" color for the frame buffer
     glClearColor(0.26f, 0.46f, 0.98f, 1.0f);
 
-    // the Shader Program for the objects used in the application
-    Shader object_shader = Shader("09_illumination_models.vert", "10_illumination_models.frag");
+    // the choose Shader Program for the objects used in the application
+    //Shader object_shader = Shader("09_illumination_models.vert", "10_illumination_models.frag", "intersection.geom");
+    Shader object_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
 
-    /* andrea: qui deve esserci la creazione di un mesh standard iniziale, che poi cambiato dall'utente, scegliendo un mesh di input
+    /* TODO: qui deve esserci la creazione di un mesh standard iniziale, che poi cambiato dall'utente, scegliendo un mesh di input
 
     */
     // load of an initial standard sphere mesh
+    // TODO: utilizzare un modello ad altissima risoluzione
     Model model("models/sphere.obj");
     //Model model("models/sphere.obj");
     // we need to set the mesh in a cube of 1x1x1 dimensions, so we will have consistency with the sculpting params
-    // andrea: FUNZIONE PER CIRCOSCRIVERE IL MESH IN UN CUBO 1x1x1
+    // TODO: FUNZIONE PER CIRCOSCRIVERE IL MESH IN UN CUBO 1x1x1
     // the mesh is static, so i set the position as static
     glm::vec3 model_pos = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 model_size = glm::vec3(1.0f, 1.0f, 1.0f);
+    
+    // After loading the default model, we need to set up the texture representing the range of action of the brush on the model
+    /*
+    TEXTURES:
+    OpenGL 4.2 introduced "immutable storage textures" -> immutable refers to the storage itself, like size, format ecc... which are fixed; the content can change
+                                                       -> immutable storage is useful in majority of cases, cause it make possible to avoid consistency checks, leading to type safety
+                                                       -> those are allocated using glTexStorage*
+    In GLSL texture are accessed via "sampler" variables -> handle to a texture unit
+                                                         -> declared as uniform variables of shaders
+                                                         -> initialized within the application stage to point the appropriate texture
+    */
+    // TODO: caricare e settare la texture (primo tentativo: creare la texture come un cerchio bianco e il resto tutto nero)
+    Texture BrushSight("textures/sight.png");
+    int loc = glGetUniformLocation(object_shader.Program, "SightTex");
+    glUniform1i(loc, 0);
     /*
     // we load the model(s) (code of Model class is in include/utils/model_v2.h)
     Model cubeModel("../../models/cube.obj");
@@ -208,15 +225,36 @@ int main()
         }
     }
     */
-
+        
     // Projection matrix: FOV angle, aspect ratio, near and far planes
     projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 10000.0f);
-
     // Model and Normal transformation matrices for the objects in the scene: we set to identity
     glm::mat4 objModelMatrix = glm::mat4(1.0f);
     glm::mat3 objNormalMatrix = glm::mat3(1.0f);
     glm::mat4 planeModelMatrix = glm::mat4(1.0f);
     glm::mat3 planeNormalMatrix = glm::mat3(1.0f);
+
+    view = camera.GetViewMatrix();
+    Ray3 camera_ray = camera.CameraRay((GLfloat) (500.0f / width), (GLfloat) (40.0f / height), 5000.0f, projection, view);
+    //Ray3 camera_ray = camera.CameraRay((GLfloat) 0 / width, (GLfloat) 0 / height, 5000.0f);
+    Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin, glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { camera_ray.origin + camera_ray.direction, glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
+    
+    //Ray3 camera_ray = camera.CameraRay((GLfloat) ((500 + 0.5f) / width), (GLfloat) ((300 + 0.5f) / height), 5000.0f, (float)screenWidth/(float)screenHeight);
+    //Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin, glm::vec3(1.0f, 0.0f, 0.0f)}, Vertex { camera_ray.direction * camera_ray.lenght, glm::vec3(1.0f, 0.0f, 0.0f)}, Vertex { (glm::normalize(camera_ray.direction - camera_ray.origin) * camera_ray.lenght) + glm::vec3(1.0f, 1.0f, 1.0f) * camera_ray.lenght, glm::vec3(1.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1, 2});
+
+    //Ray3 camera_ray = camera.CameraRay((GLfloat) cursorX / screenWidth, (GLfloat) cursorY / screenHeight, 5000.0f);
+    //Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin - glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { - ((camera_ray.origin + glm::vec3(1.0f, 0.0f, 0.0f)) * camera_ray.lenght), glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
+
+    // TRANSFORM FEEDBACK
+    float interPoint[3];
+    GLuint tbo;
+    glGenBuffers(1, &tbo);
+    glBindBuffer(GL_ARRAY_BUFFER, tbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(interPoint), nullptr, GL_STATIC_READ);
+
+    // To actually bind the buffer we've created above as transform feedback buffer, we have to use the next function
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo);
+    // END TRANSFORM FEEDBACK
 
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
@@ -245,6 +283,11 @@ int main()
         else
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
+        camera_ray = camera.CameraRay((GLfloat) cursorX / width, (GLfloat) cursorY / height, 5000.0f, projection, view); // SOLUZIONE PIU VICINA
+        // camera_ray = camera.CameraRay(cursorX, cursorY, width, height, projection, view);
+        //Mesh mesh(vector<Vertex> {Vertex { camera_ray.origin, glm::vec3(0.0f, 0.0f, 0.0f)}, Vertex { glm::normalize(camera_ray.direction - camera_ray.origin) * camera_ray.lenght, glm::vec3(0.0f, 0.0f, 0.0f)}}, vector<GLuint> {0, 1});
+        //cout << camera_ray.direction.x << endl;
+        
         /////////////////// OBJECTS ////////////////////////////////////////////////
         // We "install" the selected Shader Program as part of the current rendering process
         object_shader.Use();
@@ -264,29 +307,62 @@ int main()
         GLint alphaLocation = glGetUniformLocation(object_shader.Program, "alpha");
         GLint f0Location = glGetUniformLocation(object_shader.Program, "F0");
 
+        // we assign uniform variable for camera ray
+        GLint rayOriginLocation = glGetUniformLocation(object_shader.Program, "rayOrigin");
+        GLint rayDirLocation = glGetUniformLocation(object_shader.Program, "rayDir");
+
         // we assign the value to the uniform variable
         glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPos0));
         glUniform1f(kdLocation, Kd);
         glUniform1f(alphaLocation, alpha);
         glUniform1f(f0Location, F0);
+        glm::vec4 origin = glm::vec4(camera_ray.origin.x, camera_ray.origin.y, camera_ray.origin.z, 1.0f);
+        glm::vec4 direction = glm::vec4(camera_ray.direction.x, camera_ray.direction.y, camera_ray.direction.z, 1.0f);
+        glUniform3fv(rayOriginLocation, 1, glm::value_ptr(glm::vec3(origin.x, origin.y, origin.z)));
+        glUniform3fv(rayDirLocation, 1, glm::value_ptr(glm::vec3(direction.x, direction.y, direction.z)));
+
+        /*
+        // we create the Shader Storage Buffer Object to send data between CPU and GPU
+        // object of the ssbo
+        GLuint ssbo;
+        glGenBuffers(1, &ssbo);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(intersectionPoint), &intersectionPoint, GL_DYNAMIC_COPY); //sizeof(data) only works for statically sized C/C++ arrays.
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
+        
+        GLuint block_index = 0;
+        block_index = glGetProgramResourceIndex(object_shader.Program, GL_SHADER_STORAGE_BLOCK, "intersectionPoint");
+        GLuint ssbo_binding_point_index = 3;
+        glShaderStorageBlockBinding(object_shader.Program, block_index, ssbo_binding_point_index);
+        */
 
         /////
         // STATIC PLANE
         // we use a specific color for the plane
-        glUniform3fv(objDiffuseLocation, 1, planeMaterial);
+        glUniform3fv(objDiffuseLocation, 1, planeColor);
 
         planeModelMatrix = glm::mat4(1.0f);
         planeNormalMatrix = glm::mat3(1.0f);
-        planeModelMatrix = glm::translate(planeModelMatrix, model_pos); // andrea: posizione del modello
-        planeModelMatrix = glm::scale(planeModelMatrix, model_size); // andrea: size modello (da capire se questo basta per inscriverlo nel cubo 1x1x1)
+        // model position
+        planeModelMatrix = glm::translate(planeModelMatrix, model_pos);
+        // TODO: size modello (da capire se questo basta per inscriverlo nel cubo 1x1x1)
+        planeModelMatrix = glm::scale(planeModelMatrix, model_size);
         planeNormalMatrix = glm::inverseTranspose(glm::mat3(view*planeModelMatrix));
         glUniformMatrix4fv(glGetUniformLocation(object_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
         glUniformMatrix3fv(glGetUniformLocation(object_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
 
-        // andrea: we render the model
+        // we render the model
         model.Draw();
-        planeModelMatrix = glm::mat4(1.0f);
+        //cout << endl;
+        //planeModelMatrix = glm::mat4(1.0f);
+        //mesh.Draw(LINES);
 
+        /*
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(float) * 3, &intersectionPoint); //to update partially
+        cout << intersectionPoint[0] << endl;
+        cout << intersectionPoint[1] << endl;
+        cout << intersectionPoint[2] << endl;
+        */
         /////
         // DYNAMIC OBJECTS (FALLING CUBES + BULLETS)
         /////
@@ -388,6 +464,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastY = ypos;
 
     // we pass the offset to the Camera class instance in order to update the rendering
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    //camera.ProcessMouseMovement(xoffset, yoffset);
 
 }
