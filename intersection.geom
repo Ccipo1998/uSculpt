@@ -8,6 +8,13 @@ Geometry Shader to compute the intersection between camera_ray and each triangle
 layout (triangles) in;
 // output type and vertex count per-output-primitive
 layout (triangle_strip, max_vertices = 3) out;
+// input ssbo for intersection
+layout (std430, binding = 1) buffer intersectionSSBO
+{
+    vec3 point;
+    vec3 normal;
+    int primitiveIndex;
+} intersection;
 
 // uniform camera_ray input -> those are transformed in camera coordinates before they were passed here (in appl stage)
 uniform vec3 rayOrigin;
@@ -70,12 +77,22 @@ bool RayTriangleIntersection()
 
     float t = f * dot(e2, q);
     if (t > epsilon)
+    {
+        intersection.point = rayOrigin + rayDir * t;
+        intersection.normal = nor;
+        intersection.primitiveIndex = 0; // TODO: inserire indice della primitiva
         return true;
+    }
     
     return false;
 }
 
 void main() {
+    // intersection info cleared at each frame
+    //intersection.primitiveIndex = 1;
+    //intersection.point = vec3(0.0, 0.0, 0.0);
+    //intersection.normal = vec3(0.0, 0.0, 0.0);
+
     // if the current primitive is hitted by the camera ray, it will be red colored
     vec3 color = vec3(0.0, 0.0, 0.0);
     if (RayTriangleIntersection())

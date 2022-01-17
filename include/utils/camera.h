@@ -17,7 +17,6 @@ Universita' degli Studi di Milano
 // we use GLM to create the view matrix and to manage camera transformations
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <utils/intersection.h>
 
 // possible camera movements
 enum Camera_Movement {
@@ -35,6 +34,14 @@ const GLfloat PITCH      =  0.0f; //X
 // parameters to manage mouse movement
 const GLfloat SPEED      =  3.0f;
 const GLfloat SENSITIVITY =  0.25f;
+
+// Ray struct
+struct Ray3
+{
+    glm::vec3 origin;
+    glm::vec3 direction;
+    // TODO: valutare più avanti se serve il parametro per la lunghezza
+};
 
 ///////////////////  CAMERA class ///////////////////////
 class Camera

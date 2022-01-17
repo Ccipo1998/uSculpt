@@ -244,7 +244,11 @@ void main(void)
 {
     // we call the pointer function Illumination_Model():
     // the subroutine selected in the main application will be called and executed
-  	vec3 color = Illumination_Model() + hitColor;
+  	vec3 color = vec3(0.0, 0.0, 0.0);
+    if (hitColor != vec3(0.0, 0.0, 0.0))
+        color = hitColor;
+    else
+        color = Illumination_Model();
     //vec3 color = texture(SightTex, textCoords).rgb;   
   
     colorFrag = vec4(color, 1.0);

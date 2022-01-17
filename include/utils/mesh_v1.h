@@ -48,6 +48,15 @@ struct Vertex {
 // enum type for different types of rendering
 enum RenderingType { TRIANGLES, LINES };
 
+// the intersection struct stores the intersection point in world coordinate and the index of the hitted primitive on the mesh
+// if the primitive index is equal to -1 -> there is not intersection
+struct Intersection
+{
+    glm::vec3 point;
+    glm::vec3 normal;
+    int primitiveIndex;
+};
+
 /////////////////// MESH class ///////////////////////
 class Mesh {
 public:
@@ -157,7 +166,7 @@ public:
     }
 
     // we need to write on Vertex Array Objects and Transform Buffer Objects
-    void InitMeshUpdate(GLuint* VAOs, GLuint* TBOs, GLuint* VBOs)
+    void InitMeshUpdate(GLuint* VAOs, GLuint* TBOs, GLuint* VBOs, GLuint* SSBO)
     {
         GLuint EBO;
 
@@ -173,14 +182,6 @@ public:
         // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
         glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
         glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_COPY);
-
-        //newVertices0 = (Vertex*) glMapBufferRange(GL_ARRAY_BUFFER, 0, this->vertices.size(), GL_MAP_READ_BIT);
-        /*
-        for (int i = 0; i < model.meshes[0].vertices.size(); i++)
-        {
-            Vertex v = newVertices[i];
-        }
-        glUnmapBuffer(GL_ARRAY_BUFFER);*/
 
         // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -210,6 +211,15 @@ public:
         // Bitangent
         glEnableVertexAttribArray(4);
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
+
+        // Shader Storage Buffer Object initialization
+        glGenBuffers(1, SSBO);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, *SSBO);
+        Intersection inter = Intersection {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), -1};
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Intersection), &inter, GL_DYNAMIC_COPY);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, *SSBO);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
         // end of the first VAO
         glBindVertexArray(0);
 
@@ -252,6 +262,11 @@ public:
         // Bitangent
         glEnableVertexAttribArray(4);
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
+
+        // same Shader Storage Buffer for the other VAO (shared ssbo within the two VAOs)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, *SSBO);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
         // end of the second VAO
         glBindVertexArray(0);
 

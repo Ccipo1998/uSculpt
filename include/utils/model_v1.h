@@ -195,11 +195,13 @@ private:
             }
             else{
                 vertex.TexCoords = glm::vec2(0.0f, 0.0f);
-                cout << "WARNING::ASSIMP:: MODEL WITHOUT UV COORDINATES -> TANGENT AND BITANGENT ARE = 0" << endl;
             }
             // we add the vertex to the list
             vertices.push_back(vertex);
         }
+        // warning if there are not uv coords
+        if (!mesh->mTextureCoords[0])
+            cout << "WARNING::ASSIMP:: MODEL WITHOUT UV COORDINATES -> TANGENT AND BITANGENT ARE = 0" << endl;
 
         // for each face of the mesh, we retrieve the indices of its vertices , and we store them in a vector data structure
         for(GLuint i = 0; i < mesh->mNumFaces; i++)

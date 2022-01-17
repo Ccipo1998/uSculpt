@@ -25,6 +25,14 @@ layout (location = 4) in vec3 bitangent;
 // the numbers used for the location in the layout qualifier are the positions of the vertex attribute
 // as defined in the Mesh class
 
+// input ssbo for intersection
+layout (std430, binding = 1) buffer intersectionSSBO
+{
+    vec3 point;
+    vec3 normal;
+    int primitiveIndex;
+} intersection;
+
 // model matrix
 uniform mat4 modelMatrix;
 // view matrix
@@ -40,8 +48,9 @@ uniform mat3 normalMatrix;
 uniform vec3 pointLightPosition;
 
 // intersection point and primitive between camera ray and mesh
-uniform vec3 interPoint;
-uniform int interPrimitive;
+//uniform vec3 interPoint;
+//uniform vec3 interNormal;
+//uniform int interPrimitive;
 // TODO: passare la normale al punto di intersezione per utilizzarla nel brush
 
 // Transform Feedback parameters using "buffer ping-ponging technique"
@@ -78,10 +87,48 @@ out vec3 vViewPosition;
 void UniformBrush()
 {
   // here we work in world coordinates
-  if (interPrimitive != -1 && length(position - interPoint) < 0.3)
+  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < 0.1)
   {
     // we have the intersection and the current vertex is inside the radius of the stroke
-    newPosition = position + normal * 0.1;
+    newPosition = position + intersection.normal * 0.1;
+  }
+  else
+  {
+    // the new position is the same as the previous
+    newPosition = position;
+  }
+
+  //newPosition = position + normal * 0.1;
+  newNormal = normal;
+  newTexCoords = texcoords;
+  newTangent = tangent;
+  newBitangent = bitangent;
+}
+
+float GaussianDistribution(vec3 origin, vec3 position, float stdDev, float scaleFactor, float strength, float radius)
+{
+  float pi = 3.1415926535;
+
+  float scaledStrength = strength / radius * 0.1;
+  float N = 1.0 / (((stdDev * scaledStrength) *
+                  (stdDev * scaledStrength) *
+                  (stdDev * scaledStrength)) *
+                  sqrt((2.0 * pi) * (2.0 * pi) * (2.0 * pi)));
+  float dx = (origin.x - position.x) * scaleFactor;
+  float dy = (origin.y - position.y) * scaleFactor;
+  float dz = (origin.z - position.z) * scaleFactor;
+  float E = ((dx * dx) + (dy * dy) + (dz * dz)) /
+            (2.0 * stdDev * stdDev);
+  return N * exp(-E);
+}
+
+void GaussianBrush()
+{
+  // here we work in world coordinates
+  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < 0.1)
+  {
+    // we have the intersection and the current vertex is inside the radius of the stroke
+    newPosition = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.1, 2.0, 0.1);
   }
   else
   {
@@ -125,7 +172,7 @@ void Render()
 void main(){
   // call the right function basing on the current stage
   if (stage == 1)
-    UniformBrush();
+    GaussianBrush();
   else
     Render();
 }
