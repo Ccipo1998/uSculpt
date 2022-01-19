@@ -55,9 +55,6 @@ uniform vec3 pointLightPosition;
 
 // Transform Feedback parameters using "buffer ping-ponging technique"
 
-// Render pass
-uniform int stage;
-
 // Output to transform feedback buffers (pass 1)
 out vec3 newPosition;
 out vec3 newNormal;
@@ -109,7 +106,7 @@ float GaussianDistribution(vec3 origin, vec3 position, float stdDev, float scale
 {
   float pi = 3.1415926535;
 
-  float scaledStrength = strength / radius * 0.1;
+  float scaledStrength = strength * radius;
   float N = 1.0 / (((stdDev * scaledStrength) *
                   (stdDev * scaledStrength) *
                   (stdDev * scaledStrength)) *
@@ -125,10 +122,10 @@ float GaussianDistribution(vec3 origin, vec3 position, float stdDev, float scale
 void GaussianBrush()
 {
   // here we work in world coordinates
-  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < 0.1)
+  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < 0.5)
   {
     // we have the intersection and the current vertex is inside the radius of the stroke
-    newPosition = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.1, 2.0, 0.1);
+    newPosition = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.5, 10, 0.5);
   }
   else
   {
@@ -145,34 +142,7 @@ void GaussianBrush()
 
 // Transform Feedback functions end
 
-// Rendering functions
-
-void Render()
-{
-  // vertex position in ModelView coordinate (see the last line for the application of projection)
-  // when I need to use coordinates in camera coordinates, I need to split the application of model and view transformations from the projection transformations
-  vec4 mvPosition = viewMatrix * modelMatrix * vec4( position, 1.0 );
-
-  // view direction, negated to have vector from the vertex to the camera
-  vViewPosition = -mvPosition.xyz;
-
-  // transformations are applied to the normal
-  vNormal = normalize( normalMatrix * normal );
-
-  // light incidence direction (in view coordinate)
-  vec4 lightPos = viewMatrix  * vec4(pointLightPosition, 1.0);
-  lightDir = lightPos.xyz - mvPosition.xyz;
-
-  // we apply the projection transformation
-  gl_Position = projectionMatrix * mvPosition;
-}
-
-// Rendering functions end
-
 void main(){
   // call the right function basing on the current stage
-  if (stage == 1)
-    GaussianBrush();
-  else
-    Render();
+  GaussianBrush();
 }

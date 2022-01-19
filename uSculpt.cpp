@@ -81,8 +81,6 @@ Camera camera(glm::vec3(0.0f, 0.0f, 1.5f), GL_FALSE, 45.0f, screenWidth, screenH
 // Uniforms to be passed to shaders
 // point light position
 glm::vec3 lightPos0 = camera.Position - glm::vec3(0.0f, 0.0f, 0.05f);
-
-// TODO: trovare materiale o illumination model adatto per sculpting
 // weight for the diffusive component
 GLfloat Kd = 3.8f;
 // roughness index for GGX shader
@@ -90,22 +88,21 @@ GLfloat alpha = 0.001f;
 // Fresnel reflectance at 0 degree (Schlik's approximation)
 GLfloat F0 = 0.1f;
 
-// color of the falling objects
-GLfloat diffuseColor[] = {0.0f,0.0f,0.0f};
-// color of the plane
-GLfloat planeMaterial[] = {0.8f,0.39f,0.1f};
-// color of the bullets
-GLfloat shootColor[] = {1.0f,1.0f,0.0f};
+// TODO: capire se l'illumination model è corretto o non completo rispetto alle lezioni, perchè alcuni di questi valori non sembrano influire
+// diffuse color of the model
+GLfloat diffuseColor[] = {0.8f, 0.39f, 0.1f};
+// ambient color on the model
+GLfloat ambientColor[] = {0.15f, 0.15f, 0.15f};
+// specular color on the model
+GLfloat specularColor[] = {1.0f, 1.0f, 1.0f}; // se lo mando al fragment shader cambia la posizione della luce ...
 
-// TODO: sistemare ambient color (capire perché non funziona)
-// ambient (background) color
-GLfloat ambientColor[] = {1.0f, 0.0f, 0.0f};
+// TODO: trovare materiale o illumination model adatto per sculpting
+
+glm::vec3 model_pos = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 model_scale = glm::vec3(1.0f, 1.0f, 1.0f);
 
 // brush flag (mouse callback)
 bool brush = false;
-
-// current Shader
-Shader* current_shader = nullptr;
 
 ////////////////// MAIN function ///////////////////////
 // until the game loop, here we enter the application stage
@@ -174,22 +171,16 @@ int main()
     glEnable(GL_DEPTH_TEST);
 
     //the "clear" color for the frame buffer
-    glClearColor(0.26f, 0.46f, 0.98f, 1.0f);
+    glClearColor(0.15f, 0.15f, 0.15f, 1.0f); // TODO: capire perchè questo determina il background e non l'illumination model
 
     // the choose Shader Program for the objects used in the application
     Shader intersection_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
-    Shader brush_shader = Shader("Shader_Brushing.vert", "Shader_Standard.frag");
-    // init of current shader ref
-    current_shader = &intersection_shader;
+    Shader brush_shader = Shader("Shader_Brushing.vert", "Shader_Standard.frag"); // TODO: capire che fare con il fragment shader, visto che non viene mai utilizzato
 
     // load of an initial standard sphere mesh
-    // TODO: utilizzare un modello ad altissima risoluzione
     Model model("models/sphere1000k.obj");
 
-    // initial mesh position and scale factor
-    glm::vec3 model_pos = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 model_scale = glm::vec3(1.0f, 1.0f, 1.0f);
-
+    // TODO: utilizzare texture per fare il mirino
     // After loading the default model, we need to set up the texture representing the range of action of the brush on the model
     /*
     TEXTURES:
@@ -205,62 +196,27 @@ int main()
     int loc = glGetUniformLocation(intersection_shader.Program, "SightTex");
     glUniform1i(loc, 0);
 
-    /*
-    // we load the model(s) (code of Model class is in include/utils/model_v2.h)
-    Model cubeModel("../../models/cube.obj");
-    Model sphereModel("../../models/sphere.obj");
-
-    // dimensions and position of the static plane
-    // we will use the cube mesh to simulate the plane, because we need some "height" in the mesh
-    // in order to make it work with the physics simulation
-    glm::vec3 plane_pos = glm::vec3(0.0f, -1.0f, 0.0f);
-    glm::vec3 plane_size = glm::vec3(200.0f, 0.1f, 200.0f);
-    glm::vec3 plane_rot = glm::vec3(0.0f, 0.0f, 0.0f);
-
-    // we create 25 rigid bodies for the cubes of the scene. In this case, we use BoxShape, with the same dimensions of the cubes, as collision shape of Bullet. For more complex cases, a Bounding Box of the model may have to be calculated, and its dimensions to be passed to the physics library
-    GLint num_side = 5;
-    // total number of the cubes
-    GLint total_cubes = num_side*num_side;
-    GLint i,j;
-    // position of the cube
-    glm::vec3 cube_pos;
-    // dimension of the cube
-    glm::vec3 cube_size = glm::vec3(0.2f, 0.5f, 0.2f);
-    // we set a small initial rotation for the cubes
-    glm::vec3 cube_rot = glm::vec3(0.1f, 0.0f, 0.1f);
-
-    vector<glm::vec3> positions;
-
-    // we create a 5x5 grid of rigid bodies
-    for(i = 0; i < num_side; i++ )
-    {
-        for(j = 0; j < num_side; j++ )
-        {
-            positions.push_back(glm::vec3((i - num_side)+3, 1.0f, (num_side - j)));
-        }
-    }
-    */
-
     // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
     projection = camera.GetProjectionMatrix();
 
-    // Model and Normal transformation matrices for the objects in the scene: we set to identity
-    glm::mat4 objModelMatrix = glm::mat4(1.0f);
-    glm::mat3 objNormalMatrix = glm::mat3(1.0f);
-    glm::mat4 planeModelMatrix = glm::mat4(1.0f);
-    glm::mat3 planeNormalMatrix = glm::mat3(1.0f);
+    // Model and Normal transformation matrices for the model
+    glm::mat4 modelModelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
+    modelModelMatrix = glm::scale(modelModelMatrix, model_scale);
+    glm::mat3 modelNormalMatrix = glm::mat3(1.0f);
 
-    // camera-ray functions for intersection
+    // camera-ray functions for intersection (init)
     camera.UpdateCameraRay(0, 0);
 
+    // buffer objects for transform feedback and SSBO
     GLuint VAOs[2], feedback[2], vertices[2], inters[2];
     model.meshes[0].InitMeshUpdate(VAOs, feedback, vertices, inters);
 
+    // switch between input and output for transform feedback and rendering
     int drawBuf = 1;
 
     // fps counter
     int fps = 0;
-    // TODO: pulire il codice per utilizzare gli shader per intersezione e per brushing insieme
+
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
     {
@@ -292,81 +248,87 @@ int main()
         else
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        /////////////////// OBJECTS ////////////////////////////////////////////////
-        // We "install" the selected Shader Program as part of the current rendering process
-        // switch mechanism between the two shaders (intersection and brushing + rendering)
-        if (brush)
-        {
-            current_shader = &brush_shader;
-            brush_shader.Use();
-        }
-        else
-        {
-            current_shader = &intersection_shader;
-            intersection_shader.Use();
-        }
-        
+        // Mouse ray update for intersection test
+        camera.UpdateCameraRay(lastX, lastY);
+
+        ///////////////////////////
+        // INTERSECTION SHADER INIT
+
         // We search inside the Shader Program the name of a subroutine, and we get the numerical index
-        GLuint index = glGetSubroutineIndex(current_shader->Program, GL_FRAGMENT_SHADER, "GGX");
+        GLuint index = glGetSubroutineIndex(intersection_shader.Program, GL_FRAGMENT_SHADER, "GGX");
         // we activate the subroutine using the index
         glUniformSubroutinesuiv( GL_FRAGMENT_SHADER, 1, &index);
 
-        // Mouse ray update
-        camera.UpdateCameraRay(lastX, lastY);
-        // intersection update with new camera ray
+        // Intersection Uniform Data
 
-        //intersection = RayMeshIntersection(&model.meshes[0], &camera.CameraRay);
+        // projection matrix to Intersection Shader for rendering
+        glUniformMatrix4fv(glGetUniformLocation(intersection_shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(intersection_shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+        // specific color for the plane
+        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "diffuseColor"), 1, diffuseColor);
+        // light position
+        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "pointLightPosition"), 1, glm::value_ptr(lightPos0));
+        // illumination model parameters
+        glUniform1f(glGetUniformLocation(intersection_shader.Program, "Kd"), Kd);
+        glUniform1f(glGetUniformLocation(intersection_shader.Program, "alpha"), alpha);
+        glUniform1f(glGetUniformLocation(intersection_shader.Program, "F0"), F0);
+        // camera ray data
+        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
+        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
+        // ambient color
+        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "ambientColor"), 1, ambientColor);
+        // update normal matrix of the model basing on current view matrix
+        modelNormalMatrix = glm::inverseTranspose(glm::mat3(view * modelModelMatrix));
+        // transform matrices
+        glUniformMatrix4fv(glGetUniformLocation(intersection_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelModelMatrix));
+        glUniformMatrix3fv(glGetUniformLocation(intersection_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(modelNormalMatrix));
+        //glUniform3fv(glGetUniformLocation(intersection_shader.Program, "specularColor"), 1, specularColor);
 
-        // we pass projection and view matrices to the Shader Program
-        glUniformMatrix4fv(glGetUniformLocation(current_shader->Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(current_shader->Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+        // INTERSECTION SHADER END
+        ///////////////////////////
 
-        // we determine the position in the Shader Program of the uniform variables
-        GLint objDiffuseLocation = glGetUniformLocation(current_shader->Program, "diffuseColor");
-        GLint pointLightLocation = glGetUniformLocation(current_shader->Program, "pointLightPosition");
-        GLint kdLocation = glGetUniformLocation(current_shader->Program, "Kd");
-        GLint alphaLocation = glGetUniformLocation(current_shader->Program, "alpha");
-        GLint f0Location = glGetUniformLocation(current_shader->Program, "F0");
+        ///////////////////////////
+        // BRUSHING SHADER INIT -> TODO: alla fine settare solo le variabili che servono nel brush shader
 
-        // we assign uniform variable for camera ray
-        GLint rayOriginLocation = glGetUniformLocation(current_shader->Program, "rayOrigin");
-        GLint rayDirLocation = glGetUniformLocation(current_shader->Program, "rayDir");
+        // We search inside the Shader Program the name of a subroutine, and we get the numerical index
+        index = glGetSubroutineIndex(brush_shader.Program, GL_FRAGMENT_SHADER, "GGX");
+        // we activate the subroutine using the index
+        glUniformSubroutinesuiv( GL_FRAGMENT_SHADER, 1, &index);
 
-        // we assign the value to the uniform variable
-        glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPos0));
-        glUniform1f(kdLocation, Kd);
-        glUniform1f(alphaLocation, alpha);
-        glUniform1f(f0Location, F0);
-        // we assign the value to the uniform variables for calculate intersection with geometry shader
-        glm::vec4 origin = glm::vec4(camera.CameraRay.origin.x, camera.CameraRay.origin.y, camera.CameraRay.origin.z, 1.0f);
-        glm::vec4 direction = glm::vec4(camera.CameraRay.direction.x, camera.CameraRay.direction.y, camera.CameraRay.direction.z, 1.0f);
-        glUniform3fv(rayOriginLocation, 1, glm::value_ptr(glm::vec3(origin.x, origin.y, origin.z)));
-        glUniform3fv(rayDirLocation, 1, glm::value_ptr(glm::vec3(direction.x, direction.y, direction.z)));
+        // Intersection Uniform Data
 
-        /////
-        // STATIC PLANE
-        // we use a specific color for the plane
-        glUniform3fv(objDiffuseLocation, 1, planeMaterial);
+        // projection matrix to Intersection Shader for rendering
+        glUniformMatrix4fv(glGetUniformLocation(brush_shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(brush_shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+        // specific color for the plane
+        glUniform3fv(glGetUniformLocation(brush_shader.Program, "diffuseColor"), 1, diffuseColor);
+        // light position
+        glUniform3fv(glGetUniformLocation(brush_shader.Program, "pointLightPosition"), 1, glm::value_ptr(lightPos0));
+        // illumination model parameters
+        glUniform1f(glGetUniformLocation(brush_shader.Program, "Kd"), Kd);
+        glUniform1f(glGetUniformLocation(brush_shader.Program, "alpha"), alpha);
+        glUniform1f(glGetUniformLocation(brush_shader.Program, "F0"), F0);
+        // camera ray data
+        glUniform3fv(glGetUniformLocation(brush_shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
+        glUniform3fv(glGetUniformLocation(brush_shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
+        // ambient color
+        glUniform3fv(glGetUniformLocation(brush_shader.Program, "ambientColor"), 1, ambientColor);
+        // update normal matrix of the model basing on current view matrix
+        modelNormalMatrix = glm::inverseTranspose(glm::mat3(view * modelModelMatrix));
+        // transform matrices
+        glUniformMatrix4fv(glGetUniformLocation(brush_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelModelMatrix));
+        glUniformMatrix3fv(glGetUniformLocation(brush_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(modelNormalMatrix));
+        //glUniform3fv(glGetUniformLocation(brush_shader.Program, "specularColor"), 1, specularColor);
 
-        glUniform3fv(glGetUniformLocation(current_shader->Program, "ambientColor"), 1, ambientColor);
-
-        planeModelMatrix = glm::mat4(1.0f);
-        planeNormalMatrix = glm::mat3(1.0f);
-        planeModelMatrix = glm::translate(planeModelMatrix, model_pos); // model position
-        planeModelMatrix = glm::scale(planeModelMatrix, model_scale); // new model size
-        planeNormalMatrix = glm::inverseTranspose(glm::mat3(view*planeModelMatrix));
-        glUniformMatrix4fv(glGetUniformLocation(current_shader->Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
-        glUniformMatrix3fv(glGetUniformLocation(current_shader->Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
-
-        // TODO: aggiungere l'intersezione tramite geometry shader sia in fase di brushing che di semplice rendering -> serve anche per fare il mirino intorno al cursore
+        // BRUSHING SHADER END
+        ///////////////////////////
+        
         if (brush)
         {
             /////
             // TRANSFORM FEEDBACK START
-
             // Brush stage
-            // setting the brush stage in the vertex shader
-            glUniform1i(glGetUniformLocation(current_shader->Program, "stage"), 1);
+            brush_shader.Use();
             // disabling the rasterization during brush stage
             glEnable(GL_RASTERIZER_DISCARD);
             // setting the target buffer of transform feedback computations
@@ -379,38 +341,21 @@ int main()
             glEndTransformFeedback();
             glDisable(GL_RASTERIZER_DISCARD);
 
-            // Render stage
-            // setting the render stage in the vertex shader
-            glUniform1i(glGetUniformLocation(current_shader->Program, "stage"), 2);
+            // Render + intersection stage
+            intersection_shader.Use();
             model.Draw(VAOs[drawBuf]);
 
             // swap buffers for ping ponging
             drawBuf = 1 - drawBuf;
 
-            //glFlush();
+            glFlush();
+            
             // TRANSFORM FEEDBACK END
             /////
-
-            // TODO: questo codice ogni tanto crasha, capire il perché -> da qui
-            // updating model geometry cpu-side for next camera_ray-model intersection test
-            /*
-            glBindBuffer(GL_ARRAY_BUFFER, vertices[drawBuf]);
-            Vertex* newVertices = (Vertex*) glMapBufferRange(GL_ARRAY_BUFFER, 0, model.meshes[0].vertices.size(), GL_MAP_READ_BIT);
-            //Vertex* newVertices = nullptr;
-            //glGetBufferSubData(GL_ARRAY_BUFFER, 0, model.meshes[0].vertices.size(), newVertices);
-            //Vertex* newVertices = (Vertex*) glMapBuffer(GL_ARRAY_BUFFER, GL_MAP_READ_BIT);
-            if (newVertices != nullptr)
-            {
-                for (int i = 0; i < model.meshes[0].vertices.size(); i++)
-                {
-                    model.meshes[0].vertices[i] = newVertices[i];
-                }
-                glUnmapBuffer(GL_ARRAY_BUFFER);
-            }*/
-            // -> a qui
         }
         else
         {
+            intersection_shader.Use();
             // else i simply draw the model from the last computed buffer <- the drawBuf variable is not updated here
             model.Draw(VAOs[1 - drawBuf]);
         }
@@ -420,7 +365,7 @@ int main()
         //      il problema credo sia dovuto al fatto che viene sovrascritto in qualche modo oppure che non venga scritto quando non c'è più intersezione
         glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
-        planeModelMatrix = glm::mat4(1.0f);
+        modelModelMatrix = glm::mat4(1.0f);
         // rendering the camera ray for debugging
         //ray.Draw(LINES);
 
@@ -454,7 +399,8 @@ int main()
 
     // when I exit from the graphics loop, it is because the application is closing
     // we delete the Shader Programs
-    current_shader->Delete();
+    intersection_shader.Delete();
+    brush_shader.Delete();
 
     // we close and delete the created context
     glfwTerminate();
@@ -473,7 +419,7 @@ void apply_camera_movements()
         camera.ProcessKeyboard(LEFT, deltaTime);
     if(keys[GLFW_KEY_D])
         camera.ProcessKeyboard(RIGHT, deltaTime);
-    lightPos0 = camera.Position - glm::vec3(0.0f, 0.0f, 0.1f);
+    lightPos0 = (camera.Position - model_pos) * 1.1f; // for light from the camera effect
 }
 
 //////////////////////////////////////////
