@@ -178,7 +178,7 @@ int main()
 
     // the choose Shader Program for the objects used in the application
     Shader intersection_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
-    Shader brush_shader = Shader("Shader_Brushing.vert", "Shader_Standard.frag");
+    //Shader brush_shader = Shader("Shader_Brushing.vert", "Shader_Standard.frag", "Shader_Brushing.geom");
     // init of current shader ref
     current_shader = &intersection_shader;
 
@@ -295,6 +295,7 @@ int main()
         /////////////////// OBJECTS ////////////////////////////////////////////////
         // We "install" the selected Shader Program as part of the current rendering process
         // switch mechanism between the two shaders (intersection and brushing + rendering)
+        /*
         if (brush)
         {
             current_shader = &brush_shader;
@@ -304,8 +305,8 @@ int main()
         {
             current_shader = &intersection_shader;
             intersection_shader.Use();
-        }
-        
+        }*/
+        current_shader->Use();
         // We search inside the Shader Program the name of a subroutine, and we get the numerical index
         GLuint index = glGetSubroutineIndex(current_shader->Program, GL_FRAGMENT_SHADER, "GGX");
         // we activate the subroutine using the index
@@ -358,6 +359,7 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(current_shader->Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
         glUniformMatrix3fv(glGetUniformLocation(current_shader->Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
 
+        glUniform1i(glGetUniformLocation(current_shader->Program, "stage"), 2);
         // TODO: aggiungere l'intersezione tramite geometry shader sia in fase di brushing che di semplice rendering -> serve anche per fare il mirino intorno al cursore
         if (brush)
         {
@@ -372,9 +374,9 @@ int main()
             // setting the target buffer of transform feedback computations
             glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[drawBuf]);
 
-            glBeginTransformFeedback(GL_POINTS);
+            glBeginTransformFeedback(GL_TRIANGLES);
             glBindVertexArray(VAOs[1 - drawBuf]);
-            glDrawArrays(GL_POINTS, 0, model.meshes[0].vertices.size()); // drawing vertices like points to call the vertex shader only once per-vertex
+            glDrawArrays(GL_TRIANGLES, 0, model.meshes[0].vertices.size()); // drawing vertices like points to call the vertex shader only once per-vertex
             glBindVertexArray(0);
             glEndTransformFeedback();
             glDisable(GL_RASTERIZER_DISCARD);
