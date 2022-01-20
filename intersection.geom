@@ -21,6 +21,8 @@ uniform vec3 rayOrigin;
 uniform vec3 rayDir;
 //uniform float rayLenght;
 
+uniform int stage;
+
 /*
 in vec3 lightDir1;
 in vec3 vNormal1;
@@ -33,12 +35,22 @@ out vec3 vViewPosition;
 out vec2 textCoords;
 out vec3 hitColor;
 
+// Output to transform feedback buffers (pass 1)
+out vec3 newPosition;
+out vec3 newNormal;
+out vec2 newTexCoords;
+out vec3 newTangent;
+out vec3 newBitangent;
+
 in VS_OUT {
     vec3 position;
     vec3 lightDir;
     vec3 vNormal;
     vec3 vViewPosition;
     vec2 textCoords;
+    vec3 normal;
+    vec3 tangent;
+    vec3 bitangent;
 } gs_in[];
 
 // it is possible to use vertex data from the built-in variable gl_in, which is the previously setted gl_position variable (so in camera coordinates)
@@ -88,38 +100,67 @@ bool RayTriangleIntersection()
 }
 
 void main() {
-    // intersection info cleared at each frame
-    //intersection.primitiveIndex = 1;
-    //intersection.point = vec3(0.0, 0.0, 0.0);
-    //intersection.normal = vec3(0.0, 0.0, 0.0);
+    if (stage == 1)
+    {
+        newPosition = gs_in[0].position;
+        newNormal = gs_in[0].normal;
+        newTexCoords = gs_in[0].textCoords;
+        newTangent = gs_in[0].tangent;
+        newBitangent = gs_in[0].bitangent;
+        EmitVertex();
 
-    // if the current primitive is hitted by the camera ray, it will be red colored
-    vec3 color = vec3(0.0, 0.0, 0.0);
-    if (RayTriangleIntersection())
-        color = vec3(1.0, 0.0, 0.0);
+        newPosition = gs_in[1].position;
+        newNormal = gs_in[1].normal;
+        newTexCoords = gs_in[1].textCoords;
+        newTangent = gs_in[1].tangent;
+        newBitangent = gs_in[1].bitangent;
+        EmitVertex();
 
-    hitColor = color;
-    // at last we need to send data to the fragment shader, for each vertex generated
-    gl_Position = gl_in[0].gl_Position;
-    lightDir = gs_in[0].lightDir;
-    vNormal = gs_in[0].vNormal;
-    vViewPosition = gs_in[0].vViewPosition;
-    textCoords = gs_in[0].textCoords;
-    EmitVertex();
+        newPosition = gs_in[2].position;
+        newNormal = gs_in[2].normal;
+        newTexCoords = gs_in[2].textCoords;
+        newTangent = gs_in[2].tangent;
+        newBitangent = gs_in[2].bitangent;
+        EmitVertex();
 
-    gl_Position = gl_in[1].gl_Position;
-    lightDir = gs_in[1].lightDir;
-    vNormal = gs_in[1].vNormal;
-    vViewPosition = gs_in[1].vViewPosition;
-    textCoords = gs_in[1].textCoords;
-    EmitVertex();
+        EndPrimitive();
+    }
+    else
+    {
+        
+        // intersection info cleared at each frame
+        //intersection.primitiveIndex = 1;
+        //intersection.point = vec3(0.0, 0.0, 0.0);
+        //intersection.normal = vec3(0.0, 0.0, 0.0);
 
-    gl_Position = gl_in[2].gl_Position;
-    lightDir = gs_in[2].lightDir;
-    vNormal = gs_in[2].vNormal;
-    vViewPosition = gs_in[2].vViewPosition;
-    textCoords = gs_in[2].textCoords;
-    EmitVertex();
+        // if the current primitive is hitted by the camera ray, it will be red colored
+        vec3 color = vec3(0.0, 0.0, 0.0);
+        if (RayTriangleIntersection())
+            color = vec3(1.0, 0.0, 0.0);
 
-    EndPrimitive();
+        hitColor = color;
+        // at last we need to send data to the fragment shader, for each vertex generated
+        gl_Position = gl_in[0].gl_Position;
+        lightDir = gs_in[0].lightDir;
+        vNormal = gs_in[0].vNormal;
+        vViewPosition = gs_in[0].vViewPosition;
+        textCoords = gs_in[0].textCoords;
+        EmitVertex();
+
+        gl_Position = gl_in[1].gl_Position;
+        lightDir = gs_in[1].lightDir;
+        vNormal = gs_in[1].vNormal;
+        vViewPosition = gs_in[1].vViewPosition;
+        textCoords = gs_in[1].textCoords;
+        EmitVertex();
+
+        gl_Position = gl_in[2].gl_Position;
+        lightDir = gs_in[2].lightDir;
+        vNormal = gs_in[2].vNormal;
+        vViewPosition = gs_in[2].vViewPosition;
+        textCoords = gs_in[2].textCoords;
+        EmitVertex();
+
+        EndPrimitive();
+    }
 }

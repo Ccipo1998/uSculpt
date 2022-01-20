@@ -175,7 +175,6 @@ int main()
 
     // the choose Shader Program for the objects used in the application
     Shader intersection_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
-    Shader brush_shader = Shader("Shader_Brushing.vert", "Shader_Standard.frag"); // TODO: capire che fare con il fragment shader, visto che non viene mai utilizzato
 
     // load of an initial standard sphere mesh
     Model model("models/sphere1000k.obj");
@@ -201,7 +200,7 @@ int main()
 
     // Model and Normal transformation matrices for the model
     glm::mat4 modelModelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
-    modelModelMatrix = glm::scale(modelModelMatrix, model_scale);
+    modelModelMatrix = glm::scale(modelModelMatrix, model_scale); // TODO: pensare se modificare la funzione per la circoscrizione in un cubo in modo che sia la scala, per poi applicarla nello shader
     glm::mat3 modelNormalMatrix = glm::mat3(1.0f);
 
     // camera-ray functions for intersection (init)
@@ -251,8 +250,7 @@ int main()
         // Mouse ray update for intersection test
         camera.UpdateCameraRay(lastX, lastY);
 
-        ///////////////////////////
-        // INTERSECTION SHADER INIT
+        intersection_shader.Use();
 
         // We search inside the Shader Program the name of a subroutine, and we get the numerical index
         GLuint index = glGetSubroutineIndex(intersection_shader.Program, GL_FRAGMENT_SHADER, "GGX");
@@ -283,79 +281,41 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(intersection_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelModelMatrix));
         glUniformMatrix3fv(glGetUniformLocation(intersection_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(modelNormalMatrix));
         //glUniform3fv(glGetUniformLocation(intersection_shader.Program, "specularColor"), 1, specularColor);
+        // default stage: rendering
+        glUniform1i(glGetUniformLocation(intersection_shader.Program, "stage"), 2);
 
-        // INTERSECTION SHADER END
-        ///////////////////////////
-
-        ///////////////////////////
-        // BRUSHING SHADER INIT -> TODO: alla fine settare solo le variabili che servono nel brush shader
-
-        // We search inside the Shader Program the name of a subroutine, and we get the numerical index
-        index = glGetSubroutineIndex(brush_shader.Program, GL_FRAGMENT_SHADER, "GGX");
-        // we activate the subroutine using the index
-        glUniformSubroutinesuiv( GL_FRAGMENT_SHADER, 1, &index);
-
-        // Intersection Uniform Data
-
-        // projection matrix to Intersection Shader for rendering
-        glUniformMatrix4fv(glGetUniformLocation(brush_shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(brush_shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
-        // specific color for the plane
-        glUniform3fv(glGetUniformLocation(brush_shader.Program, "diffuseColor"), 1, diffuseColor);
-        // light position
-        glUniform3fv(glGetUniformLocation(brush_shader.Program, "pointLightPosition"), 1, glm::value_ptr(lightPos0));
-        // illumination model parameters
-        glUniform1f(glGetUniformLocation(brush_shader.Program, "Kd"), Kd);
-        glUniform1f(glGetUniformLocation(brush_shader.Program, "alpha"), alpha);
-        glUniform1f(glGetUniformLocation(brush_shader.Program, "F0"), F0);
-        // camera ray data
-        glUniform3fv(glGetUniformLocation(brush_shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
-        glUniform3fv(glGetUniformLocation(brush_shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
-        // ambient color
-        glUniform3fv(glGetUniformLocation(brush_shader.Program, "ambientColor"), 1, ambientColor);
-        // update normal matrix of the model basing on current view matrix
-        modelNormalMatrix = glm::inverseTranspose(glm::mat3(view * modelModelMatrix));
-        // transform matrices
-        glUniformMatrix4fv(glGetUniformLocation(brush_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelModelMatrix));
-        glUniformMatrix3fv(glGetUniformLocation(brush_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(modelNormalMatrix));
-        //glUniform3fv(glGetUniformLocation(brush_shader.Program, "specularColor"), 1, specularColor);
-
-        // BRUSHING SHADER END
-        ///////////////////////////
-        
         if (brush)
         {
             /////
             // TRANSFORM FEEDBACK START
             // Brush stage
-            brush_shader.Use();
+            glUniform1i(glGetUniformLocation(intersection_shader.Program, "stage"), 1);
             // disabling the rasterization during brush stage
             glEnable(GL_RASTERIZER_DISCARD);
             // setting the target buffer of transform feedback computations
             glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[drawBuf]);
 
-            glBeginTransformFeedback(GL_POINTS);
+            glBeginTransformFeedback(GL_TRIANGLES);
             glBindVertexArray(VAOs[1 - drawBuf]);
-            glDrawArrays(GL_POINTS, 0, model.meshes[0].vertices.size()); // drawing vertices like points to call the vertex shader only once per-vertex
+            glDrawArrays(GL_TRIANGLES, 0, model.meshes[0].vertices.size()); // drawing vertices like points to call the vertex shader only once per-vertex
             glBindVertexArray(0);
             glEndTransformFeedback();
             glDisable(GL_RASTERIZER_DISCARD);
 
             // Render + intersection stage
-            intersection_shader.Use();
+            glUniform1i(glGetUniformLocation(intersection_shader.Program, "stage"), 2);
             model.Draw(VAOs[drawBuf]);
 
             // swap buffers for ping ponging
             drawBuf = 1 - drawBuf;
 
-            glFlush();
+            //glFlush();
             
             // TRANSFORM FEEDBACK END
             /////
         }
         else
         {
-            intersection_shader.Use();
             // else i simply draw the model from the last computed buffer <- the drawBuf variable is not updated here
             model.Draw(VAOs[1 - drawBuf]);
         }
@@ -400,7 +360,6 @@ int main()
     // when I exit from the graphics loop, it is because the application is closing
     // we delete the Shader Programs
     intersection_shader.Delete();
-    brush_shader.Delete();
 
     // we close and delete the created context
     glfwTerminate();

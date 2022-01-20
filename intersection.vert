@@ -22,6 +22,16 @@ layout (location = 1) in vec3 normal;
 // the numbers used for the location in the layout qualifier are the positions of the vertex attribute
 // as defined in the Mesh class
 layout (location = 2) in vec2 TextCoords;
+layout (location = 3) in vec3 tangent;
+layout (location = 4) in vec3 bitangent;
+
+// input ssbo for intersection
+layout (std430, binding = 1) buffer intersectionSSBO
+{
+    vec3 point;
+    vec3 normal;
+    int primitiveIndex;
+} intersection;
 
 // model matrix
 uniform mat4 modelMatrix;
@@ -36,6 +46,8 @@ uniform mat3 normalMatrix;
 // the position of the point light is passed as uniform
 // N. B.) with more lights, and of different kinds, the shader code must be modified with a for cycle, with different treatment of the source lights parameters (directions, position, cutoff angle for spot lights, etc)
 uniform vec3 pointLightPosition;
+
+uniform int stage;
 
 // light incidence direction (in view coordinates)
 //out vec3 lightDir;
@@ -56,9 +68,63 @@ out VS_OUT {
   vec3 vNormal;
   vec3 vViewPosition;
   vec2 textCoords;
+  vec3 normal;
+  vec3 tangent;
+  vec3 bitangent;
 } vs_out;
 
+
+float GaussianDistribution(vec3 origin, vec3 position, float stdDev, float scaleFactor, float strength, float radius)
+{
+  float pi = 3.1415926535;
+
+  float scaledStrength = strength / radius * 0.1;
+  float N = 1.0 / (((stdDev * scaledStrength) *
+                  (stdDev * scaledStrength) *
+                  (stdDev * scaledStrength)) *
+                  sqrt((2.0 * pi) * (2.0 * pi) * (2.0 * pi)));
+  float dx = (origin.x - position.x) * scaleFactor;
+  float dy = (origin.y - position.y) * scaleFactor;
+  float dz = (origin.z - position.z) * scaleFactor;
+  float E = ((dx * dx) + (dy * dy) + (dz * dz)) /
+            (2.0 * stdDev * stdDev);
+  return N * exp(-E);
+}
+
+void GaussianBrush()
+{
+  // here we work in world coordinates
+  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < 0.5)
+  {
+    // we have the intersection and the current vertex is inside the radius of the stroke
+    vs_out.position = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.5, 30, 0.5);
+  }
+  else
+  {
+    // the new position is the same as the previous
+    vs_out.position = position;
+  }
+
+  //newPosition = position + normal * 0.1;
+  vs_out.normal = normal;
+  vs_out.textCoords = TextCoords;
+  vs_out.tangent = tangent;
+  vs_out.bitangent = bitangent;
+}
+
 void main(){
+  if (stage == 1)
+  {
+    GaussianBrush();
+  }
+  else
+  {
+    vs_out.position = position;
+    vs_out.normal = normal;
+    vs_out.textCoords = TextCoords;
+    vs_out.tangent = tangent;
+    vs_out.bitangent = bitangent;
+  }
 
   // vertex position in ModelView coordinate (see the last line for the application of projection)
   // when I need to use coordinates in camera coordinates, I need to split the application of model and view transformations from the projection transformations
@@ -74,10 +140,7 @@ void main(){
   vec4 lightPos = viewMatrix  * vec4(pointLightPosition, 1.0);
   vs_out.lightDir = lightPos.xyz - mvPosition.xyz;
 
-  vs_out.textCoords = TextCoords;
-
   // sending the vertex position in world coordinates to geometry shader for intersection test
-  vs_out.position = position;
 
   // we apply the projection transformation
   gl_Position = projectionMatrix * mvPosition;
