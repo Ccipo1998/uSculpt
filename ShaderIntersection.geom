@@ -57,7 +57,7 @@ in VS_OUT {
 
 // intersection test for each primitive
 // Möller–Trumbore intersection algorithm
-bool RayTriangleIntersection()
+bool RayTriangleIntersection(vec3 triangleNormal)
 {
     float epsilon = 0.0000001;
 
@@ -65,8 +65,7 @@ bool RayTriangleIntersection()
     vec3 v1 = gs_in[1].position;
     vec3 v2 = gs_in[2].position;
 
-    vec3 nor = cross(normalize(v1 - v0), normalize(v2 - v0));
-    if (dot(rayDir, nor) > epsilon)
+    if (dot(rayDir, triangleNormal) > epsilon)
         return false;
     
     vec3 e1 = v1 - v0;
@@ -91,7 +90,7 @@ bool RayTriangleIntersection()
     if (t > epsilon)
     {
         intersection.point = rayOrigin + rayDir * t;
-        intersection.normal = nor;
+        //intersection.normal = nor;
         intersection.primitiveIndex = 0; // TODO: inserire indice della primitiva
         return true;
     }
@@ -99,7 +98,21 @@ bool RayTriangleIntersection()
     return false;
 }
 
+// compute the normal to the triangle
+vec3 TriangleNormal(vec3 v0, vec3 v1, vec3 v2)
+{
+    return normalize(cross(v1 - v0, v2 - v0));
+}
+
+float TriangleArea(vec3 v0, vec3 v1, vec3 v2)
+{
+    return length(cross(v1 - v0, v2 - v0)) / 2;
+}
+
 void main() {
+    // brush
+    // TODO: in fase di brush aggiornare la normale al vertice ->
+    //  il problema qui è la concorrenza perchè per ogni vertice prima normale[vertexIndex] = 0 e poi per ogni triangolo normale[vertexIndex] += triangleNormal * triangleArea
     if (stage == 1)
     {
         newPosition = gs_in[0].position;
@@ -125,6 +138,7 @@ void main() {
 
         EndPrimitive();
     }
+    // rendering
     else
     {
         
@@ -132,31 +146,35 @@ void main() {
         //intersection.primitiveIndex = 1;
         //intersection.point = vec3(0.0, 0.0, 0.0);
         //intersection.normal = vec3(0.0, 0.0, 0.0);
+        vec3 triangleNormal = TriangleNormal(gs_in[0].position, gs_in[1].position, gs_in[2].position);
 
         // if the current primitive is hitted by the camera ray, it will be red colored
         vec3 color = vec3(0.0, 0.0, 0.0);
-        if (RayTriangleIntersection())
+        if (RayTriangleIntersection(triangleNormal))
+        {
             color = vec3(1.0, 0.0, 0.0);
+            intersection.normal = triangleNormal;
+        }
 
         hitColor = color;
         // at last we need to send data to the fragment shader, for each vertex generated
         gl_Position = gl_in[0].gl_Position;
         lightDir = gs_in[0].lightDir;
-        vNormal = gs_in[0].vNormal;
+        vNormal = triangleNormal; // normal update only for rendering
         vViewPosition = gs_in[0].vViewPosition;
         textCoords = gs_in[0].textCoords;
         EmitVertex();
 
         gl_Position = gl_in[1].gl_Position;
         lightDir = gs_in[1].lightDir;
-        vNormal = gs_in[1].vNormal;
+        vNormal = triangleNormal; // normal update for rendering
         vViewPosition = gs_in[1].vViewPosition;
         textCoords = gs_in[1].textCoords;
         EmitVertex();
 
         gl_Position = gl_in[2].gl_Position;
         lightDir = gs_in[2].lightDir;
-        vNormal = gs_in[2].vNormal;
+        vNormal = triangleNormal; // normal update for rendering
         vViewPosition = gs_in[2].vViewPosition;
         textCoords = gs_in[2].textCoords;
         EmitVertex();

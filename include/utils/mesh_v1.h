@@ -170,7 +170,6 @@ public:
     {
         GLuint EBO;
 
-        // TODO: controllare se questi passaggi per riferimento vanno bene
         // creating new VAOs for vertex array attributes structure, new TBOs for Transform Feedback input/output, new EBO for rendering triangles and new vertexBuffers aka VBOs
         glGenVertexArrays(1, &VAOs[0]);
         glGenBuffers(1, &TBOs[0]);
@@ -234,8 +233,6 @@ public:
         // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
         glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
         glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_COPY); // double copy of the data for first rendering in not-brushing stage
-
-        //newVertices1 = (Vertex*) glMapBufferRange(GL_ARRAY_BUFFER, 0, this->vertices.size(), GL_MAP_READ_BIT);
 
         // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);

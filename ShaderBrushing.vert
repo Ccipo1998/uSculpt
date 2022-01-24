@@ -78,7 +78,7 @@ float GaussianDistribution(vec3 origin, vec3 position, float stdDev, float scale
 {
   float pi = 3.1415926535;
 
-  float scaledStrength = strength / radius * 0.1;
+  float scaledStrength = strength / radius;
   float N = 1.0 / (((stdDev * scaledStrength) *
                   (stdDev * scaledStrength) *
                   (stdDev * scaledStrength)) *
@@ -97,7 +97,7 @@ void GaussianBrush()
   if (intersection.primitiveIndex != -1 && length(position - intersection.point) < 0.5)
   {
     // we have the intersection and the current vertex is inside the radius of the stroke
-    vs_out.position = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.5, 30, 0.5);
+    vs_out.position = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.5, 2, 0.5);
   }
   else
   {

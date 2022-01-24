@@ -82,9 +82,9 @@ Camera camera(glm::vec3(0.0f, 0.0f, 1.5f), GL_FALSE, 45.0f, screenWidth, screenH
 // point light position
 glm::vec3 lightPos0 = camera.Position - glm::vec3(0.0f, 0.0f, 0.05f);
 // weight for the diffusive component
-GLfloat Kd = 3.8f;
+GLfloat Kd = 4.0f;
 // roughness index for GGX shader
-GLfloat alpha = 0.001f;
+GLfloat alpha = 1.0f;
 // Fresnel reflectance at 0 degree (Schlik's approximation)
 GLfloat F0 = 0.1f;
 
@@ -94,7 +94,7 @@ GLfloat diffuseColor[] = {0.8f, 0.39f, 0.1f};
 // ambient color on the model
 GLfloat ambientColor[] = {0.15f, 0.15f, 0.15f};
 // specular color on the model
-GLfloat specularColor[] = {1.0f, 1.0f, 1.0f}; // se lo mando al fragment shader cambia la posizione della luce ...
+GLfloat specularColor[] = {1.0f, 1.0f, 1.0f};
 
 // TODO: trovare materiale o illumination model adatto per sculpting
 
@@ -174,7 +174,7 @@ int main()
     glClearColor(0.15f, 0.15f, 0.15f, 1.0f); // TODO: capire perchè questo determina il background e non l'illumination model
 
     // the choose Shader Program for the objects used in the application
-    Shader intersection_shader = Shader("intersection.vert", "intersection.frag", "intersection.geom");
+    Shader shader = Shader("ShaderBrushing.vert", "ShaderRendering.frag", "ShaderIntersection.geom");
 
     // load of an initial standard sphere mesh
     Model model("models/sphere1000k.obj");
@@ -192,7 +192,7 @@ int main()
     */
     // TODO: caricare e settare la texture (primo tentativo: creare la texture come un cerchio bianco e il resto tutto nero)
     Texture BrushSight("textures/sight.png");
-    int loc = glGetUniformLocation(intersection_shader.Program, "SightTex");
+    int loc = glGetUniformLocation(shader.Program, "SightTex");
     glUniform1i(loc, 0);
 
     // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
@@ -250,46 +250,48 @@ int main()
         // Mouse ray update for intersection test
         camera.UpdateCameraRay(lastX, lastY);
 
-        intersection_shader.Use();
+        shader.Use();
+
+        // TODO: occorre l'update delle normali, che aiuterebbe anche nella questione della visione delle modifiche sul mesh
 
         // We search inside the Shader Program the name of a subroutine, and we get the numerical index
-        GLuint index = glGetSubroutineIndex(intersection_shader.Program, GL_FRAGMENT_SHADER, "GGX");
+        GLuint index = glGetSubroutineIndex(shader.Program, GL_FRAGMENT_SHADER, "GGX");
         // we activate the subroutine using the index
         glUniformSubroutinesuiv( GL_FRAGMENT_SHADER, 1, &index);
 
         // Intersection Uniform Data
 
         // projection matrix to Intersection Shader for rendering
-        glUniformMatrix4fv(glGetUniformLocation(intersection_shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(intersection_shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
         // specific color for the plane
-        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "diffuseColor"), 1, diffuseColor);
+        glUniform3fv(glGetUniformLocation(shader.Program, "diffuseColor"), 1, diffuseColor);
         // light position
-        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "pointLightPosition"), 1, glm::value_ptr(lightPos0));
+        glUniform3fv(glGetUniformLocation(shader.Program, "pointLightPosition"), 1, glm::value_ptr(lightPos0));
         // illumination model parameters
-        glUniform1f(glGetUniformLocation(intersection_shader.Program, "Kd"), Kd);
-        glUniform1f(glGetUniformLocation(intersection_shader.Program, "alpha"), alpha);
-        glUniform1f(glGetUniformLocation(intersection_shader.Program, "F0"), F0);
+        glUniform1f(glGetUniformLocation(shader.Program, "Kd"), Kd);
+        glUniform1f(glGetUniformLocation(shader.Program, "alpha"), alpha);
+        glUniform1f(glGetUniformLocation(shader.Program, "F0"), F0);
         // camera ray data
-        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
-        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
+        glUniform3fv(glGetUniformLocation(shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
+        glUniform3fv(glGetUniformLocation(shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
         // ambient color
-        glUniform3fv(glGetUniformLocation(intersection_shader.Program, "ambientColor"), 1, ambientColor);
+        glUniform3fv(glGetUniformLocation(shader.Program, "ambientColor"), 1, ambientColor);
         // update normal matrix of the model basing on current view matrix
         modelNormalMatrix = glm::inverseTranspose(glm::mat3(view * modelModelMatrix));
         // transform matrices
-        glUniformMatrix4fv(glGetUniformLocation(intersection_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelModelMatrix));
-        glUniformMatrix3fv(glGetUniformLocation(intersection_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(modelNormalMatrix));
-        //glUniform3fv(glGetUniformLocation(intersection_shader.Program, "specularColor"), 1, specularColor);
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelModelMatrix));
+        glUniformMatrix3fv(glGetUniformLocation(shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(modelNormalMatrix));
+        glUniform3fv(glGetUniformLocation(shader.Program, "specularColor"), 1, specularColor);
         // default stage: rendering
-        glUniform1i(glGetUniformLocation(intersection_shader.Program, "stage"), 2);
+        glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
 
         if (brush)
         {
             /////
             // TRANSFORM FEEDBACK START
             // Brush stage
-            glUniform1i(glGetUniformLocation(intersection_shader.Program, "stage"), 1);
+            glUniform1i(glGetUniformLocation(shader.Program, "stage"), 1);
             // disabling the rasterization during brush stage
             glEnable(GL_RASTERIZER_DISCARD);
             // setting the target buffer of transform feedback computations
@@ -303,13 +305,13 @@ int main()
             glDisable(GL_RASTERIZER_DISCARD);
 
             // Render + intersection stage
-            glUniform1i(glGetUniformLocation(intersection_shader.Program, "stage"), 2);
+            glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
             model.Draw(VAOs[drawBuf]);
 
             // swap buffers for ping ponging
             drawBuf = 1 - drawBuf;
 
-            //glFlush();
+            glFlush();
             
             // TRANSFORM FEEDBACK END
             /////
@@ -321,9 +323,8 @@ int main()
         }
 
         // a memory barrier for the ssbo is needed to guarantee that the further operations (here the brush shaders using the intersection info) will see this writes
-        //TODO: questo non risolve il problema del fatto che lo shader non vede l'indice -1 quando il raggio della camera non interseca il modello, capire perchè
+        //TODO: lo shader non vede l'indice -1 quando il raggio della camera non interseca il modello, capire perchè
         //      il problema credo sia dovuto al fatto che viene sovrascritto in qualche modo oppure che non venga scritto quando non c'è più intersezione
-        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
         modelModelMatrix = glm::mat4(1.0f);
         // rendering the camera ray for debugging
@@ -359,7 +360,7 @@ int main()
 
     // when I exit from the graphics loop, it is because the application is closing
     // we delete the Shader Programs
-    intersection_shader.Delete();
+    shader.Delete();
 
     // we close and delete the created context
     glfwTerminate();
