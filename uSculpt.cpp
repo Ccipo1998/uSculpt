@@ -44,7 +44,7 @@
 #include <stb_image/stb_image.h>
 
 // windows' dimensions
-GLuint screenWidth = 1000, screenHeight = 600;
+GLuint screenWidth = 1500, screenHeight = 900;
 
 // callback functions for keyboard and mouse events (events handle for user commands)
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -68,6 +68,11 @@ bool firstMouse = true;
 // parameters for time calculation (for animations)
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
+
+// for fps counter
+GLfloat lastFPS = 0.0f;
+GLfloat deltaFPS = 0.0f;
+unsigned int fps = 0;
 
 // boolean to activate/deactivate wireframe rendering
 GLboolean wireframe = GL_FALSE;
@@ -213,9 +218,6 @@ int main()
     // switch between input and output for transform feedback and rendering
     int drawBuf = 1;
 
-    // fps counter
-    int fps = 0;
-
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
     {
@@ -226,8 +228,14 @@ int main()
         lastFrame = currentFrame;
 
         // update fps counter
-        fps = (int) 1 / deltaTime;
-        cout << '\r' << std::setw(2) << "FPS: " << fps << std::flush;
+        deltaFPS = currentFrame - lastFPS;
+        fps++;
+        if (deltaFPS >= 1.0f)
+        {
+            cout << '\r' << std::setw(2) << "FPS: " << (unsigned int)((1.0f / deltaFPS) * fps) << std::flush;
+            lastFPS = currentFrame;
+            fps = 0;
+        }
 
         // Check is an I/O event is happening
         glfwPollEvents();
