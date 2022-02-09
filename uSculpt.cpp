@@ -43,6 +43,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 
+// include for gui
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_opengl3.h>
+#include <imgui/imgui_impl_glfw.h>
+
 // windows' dimensions
 GLuint screenWidth = 1500, screenHeight = 900;
 
@@ -87,7 +92,7 @@ Camera camera(glm::vec3(0.0f, 0.0f, 1.5f), GL_FALSE, 45.0f, screenWidth, screenH
 // point light position
 glm::vec3 lightPos0 = camera.Position - glm::vec3(0.0f, 0.0f, 0.05f);
 // weight for the diffusive component
-GLfloat Kd = 4.0f;
+GLfloat Kd = 3.0f;
 // roughness index for GGX shader
 GLfloat alpha = 1.0f;
 // Fresnel reflectance at 0 degree (Schlik's approximation)
@@ -108,6 +113,10 @@ glm::vec3 model_scale = glm::vec3(1.0f, 1.0f, 1.0f);
 
 // brush flag (mouse callback)
 bool brush = false;
+
+// sculpting params
+float radius = 0.5f;
+float strength = 1.0f;
 
 ////////////////// MAIN function ///////////////////////
 // until the game loop, here we enter the application stage
@@ -218,6 +227,14 @@ int main()
     // switch between input and output for transform feedback and rendering
     int drawBuf = 1;
 
+    // gui init
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 460");
+
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
     {
@@ -236,6 +253,16 @@ int main()
             lastFPS = currentFrame;
             fps = 0;
         }
+
+        // gui
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::Begin("Sculpting parameters"); 
+        ImGui::SliderFloat("Radius", &radius, 0.1f, 0.5f);
+        ImGui::SliderFloat("Strength", &strength, 0.1f, 3.0f);
+        ImGui::End();
+        ImGui::Render();
 
         // Check is an I/O event is happening
         glfwPollEvents();
@@ -259,8 +286,6 @@ int main()
         camera.UpdateCameraRay(lastX, lastY);
 
         shader.Use();
-
-        // TODO: occorre l'update delle normali, che aiuterebbe anche nella questione della visione delle modifiche sul mesh
 
         // We search inside the Shader Program the name of a subroutine, and we get the numerical index
         GLuint index = glGetSubroutineIndex(shader.Program, GL_FRAGMENT_SHADER, "GGX");
@@ -293,6 +318,9 @@ int main()
         glUniform3fv(glGetUniformLocation(shader.Program, "specularColor"), 1, specularColor);
         // default stage: rendering
         glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
+        // passing sculpting params
+        glUniform1f(glGetUniformLocation(shader.Program, "radius"), radius);
+        glUniform1f(glGetUniformLocation(shader.Program, "strength"), strength);
 
         if (brush)
         {
@@ -362,6 +390,9 @@ int main()
         }
         */
 
+        // gui cleaning
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         // Faccio lo swap tra back e front buffer
         glfwSwapBuffers(window);
     }
@@ -369,6 +400,11 @@ int main()
     // when I exit from the graphics loop, it is because the application is closing
     // we delete the Shader Programs
     shader.Delete();
+
+    // gui delete
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     // we close and delete the created context
     glfwTerminate();

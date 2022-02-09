@@ -25,6 +25,7 @@ Debug
 *.out
 *.app
 bin/*
+imgui.ini
 
 # Icon must end with two \r
 Icon

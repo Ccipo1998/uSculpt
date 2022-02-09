@@ -49,6 +49,10 @@ uniform vec3 pointLightPosition;
 
 uniform int stage;
 
+// sculpting params
+uniform float radius;
+uniform float strength;
+
 // light incidence direction (in view coordinates)
 //out vec3 lightDir;
 // the transformed normal (in view coordinate) is set as an output variable, to be "passed" to the fragment shader
@@ -91,13 +95,34 @@ float GaussianDistribution(vec3 origin, vec3 position, float stdDev, float scale
   return N * exp(-E);
 }
 
+float NewGaussianDistribution(vec3 origin, vec3 position, float strength, float radius)
+{
+  float pi = 3.1415926535;
+  float stdDev = 1.5;
+
+  float N = 1.0 / ((stdDev * stdDev * stdDev) * sqrt((2.0 * pi) * (2.0 * pi) * (2.0 * pi)));
+  N = N * (strength * 0.2);
+  float dx = (origin.x - position.x) * 4.5 / radius;
+  float dy = (origin.y - position.y) * 4.5 / radius;
+  float dz = (origin.z - position.z) * 4.5 / radius;
+  float E = ((dx * dx) + (dy * dy) + (dz * dz)) / (2 * stdDev * stdDev);
+  
+  return N * exp(-E);
+}
+
+float RadiusOffset(float radius, float strength)
+{
+  return 0.1;
+}
+
 void GaussianBrush()
 {
   // here we work in world coordinates
-  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < 0.5)
+  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < (radius + RadiusOffset(radius, strength)))
   {
     // we have the intersection and the current vertex is inside the radius of the stroke
-    vs_out.position = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.5, 2, 0.5);
+    //vs_out.position = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.5, 2, 0.5);
+    vs_out.position = position + intersection.normal * NewGaussianDistribution(intersection.point, position, strength, radius);
   }
   else
   {
