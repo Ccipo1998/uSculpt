@@ -91,7 +91,7 @@ bool RayTriangleIntersection(vec3 triangleNormal)
     {
         intersection.point = rayOrigin + rayDir * t;
         //intersection.normal = nor;
-        intersection.primitiveIndex = 0; // TODO: inserire indice della primitiva
+        intersection.primitiveIndex = gl_PrimitiveID;
         return true;
     }
     
@@ -111,8 +111,6 @@ float TriangleArea(vec3 v0, vec3 v1, vec3 v2)
 
 void main() {
     // brush
-    // TODO: in fase di brush aggiornare la normale al vertice ->
-    //  il problema qui è la concorrenza perchè per ogni vertice prima normale[vertexIndex] = 0 e poi per ogni triangolo normale[vertexIndex] += triangleNormal * triangleArea
     if (stage == 1)
     {
         newPosition = gs_in[0].position;

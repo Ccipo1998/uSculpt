@@ -106,16 +106,16 @@ GLfloat ambientColor[] = {0.15f, 0.15f, 0.15f};
 // specular color on the model
 GLfloat specularColor[] = {1.0f, 1.0f, 1.0f};
 
-// TODO: trovare materiale o illumination model adatto per sculpting
-
 glm::vec3 model_pos = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::vec3 model_scale = glm::vec3(1.0f, 1.0f, 1.0f);
+glm::mat4 modelMatrix = glm::mat4(1.0f);
 
-// brush flag (mouse callback)
+// mouse callbacks flags
 bool brush = false;
+bool rotation = false;
 
 // sculpting params
-float radius = 0.5f;
+float radius = 0.25f;
 float strength = 1.0f;
 
 ////////////////// MAIN function ///////////////////////
@@ -213,9 +213,9 @@ int main()
     projection = camera.GetProjectionMatrix();
 
     // Model and Normal transformation matrices for the model
-    glm::mat4 modelModelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
-    modelModelMatrix = glm::scale(modelModelMatrix, model_scale); // TODO: pensare se modificare la funzione per la circoscrizione in un cubo in modo che sia la scala, per poi applicarla nello shader
-    glm::mat3 modelNormalMatrix = glm::mat3(1.0f);
+    modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
+    modelMatrix = glm::scale(modelMatrix, model_scale);
+    glm::mat4 normalmatrix = glm::mat4(1.0f);
 
     // camera-ray functions for intersection (init)
     camera.UpdateCameraRay(0, 0);
@@ -311,10 +311,10 @@ int main()
         // ambient color
         glUniform3fv(glGetUniformLocation(shader.Program, "ambientColor"), 1, ambientColor);
         // update normal matrix of the model basing on current view matrix
-        modelNormalMatrix = glm::inverseTranspose(glm::mat3(view * modelModelMatrix));
+        //normalmatrix = glm::inverseTranspose(glm::mat3(view * modelMatrix));
         // transform matrices
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelModelMatrix));
-        glUniformMatrix3fv(glGetUniformLocation(shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(modelNormalMatrix));
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalmatrix));
         glUniform3fv(glGetUniformLocation(shader.Program, "specularColor"), 1, specularColor);
         // default stage: rendering
         glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
@@ -362,7 +362,7 @@ int main()
         //TODO: lo shader non vede l'indice -1 quando il raggio della camera non interseca il modello, capire perchè
         //      il problema credo sia dovuto al fatto che viene sovrascritto in qualche modo oppure che non venga scritto quando non c'è più intersezione
 
-        modelModelMatrix = glm::mat4(1.0f);
+        //modelMatrix = glm::mat4(1.0f);
         // rendering the camera ray for debugging
         //ray.Draw(LINES);
 
@@ -456,7 +456,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
       // we calculate the offset of the mouse cursor from the position in the last frame
       // when rendering the first frame, we do not have a "previous state" for the mouse, so we set the previous state equal to the initial values (thus, the offset will be = 0)
 
-    if(firstMouse)
+    if (firstMouse)
     {
         lastX = xpos;
         lastY = ypos;
@@ -475,6 +475,18 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     lastX = xpos;
     lastY = ypos;
 
+    // using mouse offset to move the model (0.2f is the sensitivity -> add a parameter)
+    xoffset *= 0.01f;
+    yoffset *= 0.01f;
+    if (rotation)
+    {
+        // TODO: provare la scomposizione della retta di rotazione in angolo rispetto agli assi x, y, z -> così forse la rotazione viene corretta
+        //glm::vec3 rotAxis = (camera.Up * xoffset)
+        //float xcomponent = 
+        modelMatrix = glm::rotate(modelMatrix, xoffset, camera.Up);
+        modelMatrix = glm::rotate(modelMatrix, -yoffset, camera.Right);
+    }
+
     // we pass the offset to the Camera class instance in order to update the rendering
     //camera.ProcessMouseMovement(xoffset, yoffset);
 
@@ -488,4 +500,9 @@ void mouse_key_callback(GLFWwindow* window, int button, int action, int mods)
         brush = true;
     else
         brush = false;
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+        rotation = true;
+    else
+        rotation = false;
 }

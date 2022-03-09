@@ -41,7 +41,7 @@ uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
 
 // normals transformation matrix (= transpose of the inverse of the model-view matrix)
-uniform mat3 normalMatrix;
+uniform mat4 normalMatrix;
 
 // the position of the point light is passed as uniform
 // N. B.) with more lights, and of different kinds, the shader code must be modified with a for cycle, with different treatment of the source lights parameters (directions, position, cutoff angle for spot lights, etc)
@@ -102,9 +102,9 @@ float NewGaussianDistribution(vec3 origin, vec3 position, float strength, float 
 
   float N = 1.0 / ((stdDev * stdDev * stdDev) * sqrt((2.0 * pi) * (2.0 * pi) * (2.0 * pi)));
   N = N * (strength * 0.2);
-  float dx = (origin.x - position.x) * 4.5 / radius;
-  float dy = (origin.y - position.y) * 4.5 / radius;
-  float dz = (origin.z - position.z) * 4.5 / radius;
+  float dx = (origin.x - position.x) * 4.0 / radius;
+  float dy = (origin.y - position.y) * 4.0 / radius;
+  float dz = (origin.z - position.z) * 4.0 / radius;
   float E = ((dx * dx) + (dy * dy) + (dz * dz)) / (2 * stdDev * stdDev);
   
   return N * exp(-E);
@@ -112,17 +112,17 @@ float NewGaussianDistribution(vec3 origin, vec3 position, float strength, float 
 
 float RadiusOffset(float radius, float strength)
 {
-  return 0.1;
+  return 0.2; // TODO: aggiungere metodo per aggiungere un po' di offset al raggio in base al raggio corrente e a strength
 }
 
 void GaussianBrush()
 {
   // here we work in world coordinates
-  if (intersection.primitiveIndex != -1 && length(position - intersection.point) < (radius + RadiusOffset(radius, strength)))
+  if (intersection.primitiveIndex != -1 && length(position - (inverse(modelMatrix) * vec4(intersection.point, 1.0)).xyz) < (radius + RadiusOffset(radius, strength)))
   {
     // we have the intersection and the current vertex is inside the radius of the stroke
     //vs_out.position = position + intersection.normal * GaussianDistribution(intersection.point, position, 0.7, 3.5 / 0.5, 2, 0.5);
-    vs_out.position = position + intersection.normal * NewGaussianDistribution(intersection.point, position, strength, radius);
+    vs_out.position = position + (inverse(modelMatrix) * vec4(intersection.normal, 1.0)).xyz * NewGaussianDistribution((inverse(modelMatrix) * vec4(intersection.point, 1.0)).xyz, position, strength, radius);
   }
   else
   {
@@ -144,7 +144,7 @@ void main(){
   }
   else
   {
-    vs_out.position = position;
+    vs_out.position = (modelMatrix * vec4(position, 1.0)).xyz;
     vs_out.normal = normal;
     vs_out.textCoords = TextCoords;
     vs_out.tangent = tangent;
@@ -153,13 +153,13 @@ void main(){
 
   // vertex position in ModelView coordinate (see the last line for the application of projection)
   // when I need to use coordinates in camera coordinates, I need to split the application of model and view transformations from the projection transformations
-  vec4 mvPosition = viewMatrix * vec4( position, 1.0 );
+  vec4 mvPosition = viewMatrix * modelMatrix * vec4( position, 1.0 );
   
   // view direction, negated to have vector from the vertex to the camera
   vs_out.vViewPosition = -mvPosition.xyz;
 
   // transformations are applied to the normal
-  vs_out.vNormal = normalize( normalMatrix * normal );
+  vs_out.vNormal = normalize((normalMatrix * vec4(normal, 1.0)).xyz);
 
   // light incidence direction (in view coordinate)
   vec4 lightPos = viewMatrix  * vec4(pointLightPosition, 1.0);
