@@ -187,7 +187,7 @@ public:
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_DYNAMIC_COPY);
 
         // setup the feedback objects
-        glGenTransformFeedbacks(2, &TBOs[0]);
+        glGenTransformFeedbacks(1, &TBOs[0]);
 
         // setup the first link TBO1<->VBO1
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TBOs[0]);
@@ -237,6 +237,9 @@ public:
         // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_DYNAMIC_COPY);
+
+        // setup the feedback objects
+        glGenTransformFeedbacks(1, &TBOs[1]);
 
         // setup the second link TBO2<->VBO2
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TBOs[1]);
