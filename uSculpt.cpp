@@ -139,7 +139,7 @@ GLfloat F0 = 0.1f;
 #pragma region MODEL PARAMETERS
 
 // diffuse color of the model
-GLfloat diffuseColor[] = {0.8f, 0.39f, 0.1f};
+GLfloat diffuseColor[] = {0.90f, 0.55f, 0.39f};
 // ambient color on the model
 GLfloat ambientColor[] = {0.15f, 0.15f, 0.15f};
 // specular color on the model
