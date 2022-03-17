@@ -1,24 +1,22 @@
 /*
-
-10_illumination_models.frag: Fragment shader for the Lambert, Phong, Blinn-Phong and GGX illumination models
-
-N.B. 1)  "09_illumination_models.vert" must be used as vertex shader
-
-N.B. 2)  the different illumination models are implemented using Shaders Subroutines
-
-author: Davide Gadia
-
-Real-Time Graphics Programming - a.a. 2020/2021
+Real-time Graphics Programming - a.a. 2021/2022
 Master degree in Computer Science
 Universita' degli Studi di Milano
 
+Fragment shader for:
+- Lambert, Phong, Blinn-Phong and GGX illumination models
+
+N.B. 1)  the different illumination models are implemented using Shaders Subroutines
+
+author: Andrea Cipollini; based on RTGP course code by prof. Davide Gadia
 */
 
 #version 460 core
 
+// greek pi
 const float PI = 3.14159265359;
 
-// output shader variable
+// output shader (fragment color)
 out vec4 colorFrag;
 
 // light incidence direction (calculated in vertex shader, interpolated by rasterization)
@@ -27,10 +25,10 @@ in vec3 lightDir;
 in vec3 vNormal;
 // vector from fragment to camera (in view coordinate)
 in vec3 vViewPosition;
-
+// texture coordinates to apply a texture
 in vec2 textCoords;
-
-in vec3 hitColor;
+// input from geometry shader
+in float hit;
 
 // ambient, diffusive and specular components (passed from the application)
 uniform vec3 ambientColor;
@@ -123,8 +121,7 @@ vec3 Phong() // this name is the one which is detected by the SetupShaders() fun
 subroutine(ill_model)
 vec3 BlinnPhong() // this name is the one which is detected by the SetupShaders() function in the main application, and the one used to swap subroutines
 {
-    // TODO: prova texture
-    vec3 texColor = texture(SightTex, textCoords).rgb;
+    //vec3 texColor = texture(SightTex, textCoords).rgb; // TODO: add texture for the sight
 
     // ambient component can be calculated at the beginning
     vec3 color = Ka*ambientColor;
@@ -244,12 +241,9 @@ void main(void)
 {
     // we call the pointer function Illumination_Model():
     // the subroutine selected in the main application will be called and executed
-  	vec3 color = vec3(0.0, 0.0, 0.0);
-    if (hitColor != vec3(0.0, 0.0, 0.0))
-        color = hitColor;
-    else
-        color = Illumination_Model();
-    //vec3 color = texture(SightTex, textCoords).rgb;   
+    vec3 illColor = Illumination_Model();
+    // if the fragment is in the area of the hitted triangle -> we color it in red
+    vec3 color = vec3(max(1.0 * hit, illColor.x), min(1.0 - 1.0 * hit, illColor.y), min(1.0 - 1.0 * hit, illColor.z));
   
     colorFrag = vec4(color, 1.0);
 }

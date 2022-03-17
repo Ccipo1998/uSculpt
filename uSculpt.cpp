@@ -1,3 +1,18 @@
+/*
+Real-time Graphics Programming - a.a. 2021/2022
+Master degree in Computer Science
+Universita' degli Studi di Milano
+
+Real-Time Graphics Programming degree course project:
+        tiny GPU-based (OPENGL, GLSL) real-time digital sculpting tool
+
+author: Andrea Cipollini -> based on RTGP course code by prof. Davide Gadia
+                            based on ysculpting (https://github.com/Ccipo1998/Bachelor-Degree-Internship) by Andrea Cipollini and prof. Fabio Pellacini
+
+Main Class
+*/
+
+#pragma region INCLUDES
 
 // Std. Includes
 #include <string>
@@ -26,8 +41,8 @@
 #endif
 
 // classes developed during lab lectures to manage shaders, to load models, for FPS camera, and for physical simulation
-#include <utils/shader_v1.h>
-#include <utils/model_v1.h>
+#include <utils/shader.h>
+#include <utils/model.h>
 #include <utils/camera.h>
 #include <utils/texture.h>
 
@@ -48,8 +63,15 @@
 #include <imgui/imgui_impl_opengl3.h>
 #include <imgui/imgui_impl_glfw.h>
 
+#pragma endregion INCLUDES
+
 // windows' dimensions
 GLuint screenWidth = 1500, screenHeight = 900;
+
+// boolean to activate/deactivate wireframe rendering
+GLboolean wireframe = GL_FALSE;
+
+#pragma region FUNCTION DECLARATIONS
 
 // callback functions for keyboard and mouse events (events handle for user commands)
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
@@ -58,39 +80,53 @@ void mouse_key_callback(GLFWwindow* window, int button, int action, int mods);
 // if one of the WASD keys is pressed, we call the corresponding method of the Camera class
 void apply_camera_movements();
 
+#pragma endregion FUNCTION DECLARATIONS
+
+#pragma region EVENT PARAMETERS
+
 // we initialize an array of booleans for each keybord key
 bool keys[1024];
 
 // we set the initial position of mouse cursor in the application window
 GLfloat lastX = 0.0f, lastY = 0.0f;
 
-// we will use these value to "pass" the cursor position to the keyboard callback, in order to determine the bullet trajectory
-double cursorX,cursorY;
-
 // when rendering the first frame, we do not have a "previous state" for the mouse, so we need to manage this situation
 bool firstMouse = true;
 
-// parameters for time calculation (for animations)
+// mouse callbacks flags
+bool brush = false;
+bool rotation = false;
+
+#pragma endregion EVENT PARAMETERS
+
+#pragma region FRAME PARAMETERS
+
+// parameters for movements and fps counter
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
-
-// for fps counter
 GLfloat lastFPS = 0.0f;
 GLfloat deltaFPS = 0.0f;
 unsigned int fps = 0;
 
-// boolean to activate/deactivate wireframe rendering
-GLboolean wireframe = GL_FALSE;
+#pragma endregion FRAME PARAMETERS
+
+#pragma region PROJECTION
 
 // view and projection matrices (global because we need to use them in the keyboard callback)
 glm::mat4 view, projection;
 
 // we create a camera. We pass the initial position as a parameter to the constructor. In this case, we use a "floating" camera (we pass false as second parameter)
-Camera camera(glm::vec3(0.0f, 0.0f, 1.5f), GL_FALSE, 45.0f, screenWidth, screenHeight, 0.1f, 1000.0f); // camera position such as the model is at position (0, 0, 0)
+Camera camera(glm::vec3(0.0f, 0.0f, 1.5f), GL_FALSE, 45.0f, screenWidth, screenHeight, 0.1f, 1000.0f); // the model is in position by default (0, 0, 0)
+
+#pragma endregion PROJECTION
+
+#pragma region SHADER UNIFORMS
 
 // Uniforms to be passed to shaders
-// point light position
-glm::vec3 lightPos0 = camera.Position - glm::vec3(0.0f, 0.0f, 0.05f);
+
+// point light position (camera eye light)
+glm::vec3 pointLightPosition = camera.Position - glm::vec3(0.0f, 0.0f, 0.05f); // little bit behind the camera (to avoid artifacts)
+// illumination model parameters
 // weight for the diffusive component
 GLfloat Kd = 3.0f;
 // roughness index for GGX shader
@@ -98,7 +134,10 @@ GLfloat alpha = 1.0f;
 // Fresnel reflectance at 0 degree (Schlik's approximation)
 GLfloat F0 = 0.1f;
 
-// TODO: capire se l'illumination model è corretto o non completo rispetto alle lezioni, perchè alcuni di questi valori non sembrano influire
+#pragma endregion SHADER UNIFORMS
+
+#pragma region MODEL PARAMETERS
+
 // diffuse color of the model
 GLfloat diffuseColor[] = {0.8f, 0.39f, 0.1f};
 // ambient color on the model
@@ -106,22 +145,27 @@ GLfloat ambientColor[] = {0.15f, 0.15f, 0.15f};
 // specular color on the model
 GLfloat specularColor[] = {1.0f, 1.0f, 1.0f};
 
+// model default parameters
 glm::vec3 model_pos = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::vec3 model_scale = glm::vec3(1.0f, 1.0f, 1.0f);
 glm::mat4 modelMatrix = glm::mat4(1.0f);
 
-// mouse callbacks flags
-bool brush = false;
-bool rotation = false;
+#pragma endregion MODEL PARAMETERS
+
+#pragma region SCULPTING PARAMETERS
 
 // sculpting params
 float radius = 0.25f;
 float strength = 1.0f;
 
+#pragma endregion SCULPTING PARAMETERS
+
 ////////////////// MAIN function ///////////////////////
 // until the game loop, here we enter the application stage
 int main()
 {
+    #pragma region WINDOW AND CONTEXT INIT
+
     // Initialization of OpenGL context using GLFW
     glfwInit();
     // We set OpenGL specifications required for this application
@@ -175,23 +219,20 @@ int main()
     printf("GL Version (integer)    :%d.%d\n", major, minor);
     printf("GLSL version            :%s\n", glslversion);
 
+    #pragma endregion WINDOW AND CONTEXT INIT
+
     // we define the viewport dimensions and position compared to the window
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    // TODO: forse qui è da considerare la barra delle impostazioni, da eliminare nella dimensione della viewport rispetto alla dimensione della finestra
     glViewport(0, 0, width, height);
 
     // we enable Z test
     glEnable(GL_DEPTH_TEST);
 
     //the "clear" color for the frame buffer
-    glClearColor(0.15f, 0.15f, 0.15f, 1.0f); // TODO: capire perchè questo determina il background e non l'illumination model
+    glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
 
-    // the choose Shader Program for the objects used in the application
-    Shader shader = Shader("ShaderBrushing.vert", "ShaderRendering.frag", "ShaderIntersection.geom");
-
-    // load of an initial standard sphere mesh
-    Model model("models/sphere1000k.obj");
+    #pragma region TEXTURE TODO
 
     // TODO: utilizzare texture per fare il mirino
     // After loading the default model, we need to set up the texture representing the range of action of the brush on the model
@@ -203,22 +244,34 @@ int main()
     In GLSL texture are accessed via "sampler" variables -> handle to a texture unit
                                                          -> declared as uniform variables of shaders
                                                          -> initialized within the application stage to point the appropriate texture
-    */
-    // TODO: caricare e settare la texture (primo tentativo: creare la texture come un cerchio bianco e il resto tutto nero)
     Texture BrushSight("textures/sight.png");
     int loc = glGetUniformLocation(shader.Program, "SightTex");
     glUniform1i(loc, 0);
+    */
 
-    // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
-    projection = camera.GetProjectionMatrix();
+    #pragma endregion TEXTURE TODO
+
+    #pragma region MODEL INIT
+
+    // loading of an initial standard sphere mesh
+    Model model("models/sphere1000k.obj");
 
     // Model and Normal transformation matrices for the model
     modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
     modelMatrix = glm::scale(modelMatrix, model_scale);
     glm::mat4 normalmatrix = glm::mat4(1.0f);
 
+    #pragma endregion MODEL INIT
+
+    // the choose Shader Program for the objects used in the application
+    Shader shader = Shader("ShaderBrushing.vert", "ShaderRendering.frag", "ShaderIntersection.geom");
+
+    // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
+    projection = camera.GetProjectionMatrix();
     // camera-ray functions for intersection (init)
     camera.UpdateCameraRay(0, 0);
+
+    #pragma region TRANSFORM FEEDBACK INIT
 
     // buffer objects for transform feedback and SSBO
     GLuint VAOs[2], feedback[2], vertices[2], inters[2];
@@ -226,6 +279,10 @@ int main()
 
     // switch between input and output for transform feedback and rendering
     int drawBuf = 1;
+
+    #pragma endregion TRANSFORM FEEDBACK INIT
+
+    #pragma region GUI INIT
 
     // gui init
     IMGUI_CHECKVERSION();
@@ -235,9 +292,13 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
+    #pragma endregion GUI INIT
+
     // Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
     {
+        #pragma region FRAME TIME
+
         // we determine the time passed from the beginning
         // and we calculate time difference between current frame rendering and the previous one
         GLfloat currentFrame = glfwGetTime();
@@ -254,6 +315,10 @@ int main()
             fps = 0;
         }
 
+        #pragma endregion FRAME TIME
+
+        #pragma region GUI RENDERING
+
         // gui
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -264,12 +329,15 @@ int main()
         ImGui::End();
         ImGui::Render();
 
-        // Check is an I/O event is happening
+        #pragma endregion GUI RENDERING
+
+        // Check if an I/O event is happening
         glfwPollEvents();
-        // we apply FPS camera movements
+
+        // we apply camera movements
         apply_camera_movements();
+
         // View matrix (=camera): position, view direction, camera "up" vector
-        // in this example, it has been defined as a global variable (we need it in the keyboard callback function)
         view = camera.GetViewMatrix();
 
         // we "clear" the frame and z buffer
@@ -285,6 +353,7 @@ int main()
         // Mouse ray update for intersection test
         camera.UpdateCameraRay(lastX, lastY);
 
+        // select the shader to use
         shader.Use();
 
         // We search inside the Shader Program the name of a subroutine, and we get the numerical index
@@ -292,40 +361,43 @@ int main()
         // we activate the subroutine using the index
         glUniformSubroutinesuiv( GL_FRAGMENT_SHADER, 1, &index);
 
-        // Intersection Uniform Data
+        #pragma region UNIFORMS
 
-        // projection matrix to Intersection Shader for rendering
+        // projection and view matrix for intersection and rendering
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
-        // specific color for the plane
+
+        // colors, light and illumination
         glUniform3fv(glGetUniformLocation(shader.Program, "diffuseColor"), 1, diffuseColor);
-        // light position
-        glUniform3fv(glGetUniformLocation(shader.Program, "pointLightPosition"), 1, glm::value_ptr(lightPos0));
-        // illumination model parameters
+        glUniform3fv(glGetUniformLocation(shader.Program, "pointLightPosition"), 1, glm::value_ptr(pointLightPosition));
         glUniform1f(glGetUniformLocation(shader.Program, "Kd"), Kd);
         glUniform1f(glGetUniformLocation(shader.Program, "alpha"), alpha);
         glUniform1f(glGetUniformLocation(shader.Program, "F0"), F0);
+        glUniform3fv(glGetUniformLocation(shader.Program, "ambientColor"), 1, ambientColor);
+        glUniform3fv(glGetUniformLocation(shader.Program, "specularColor"), 1, specularColor);
+
         // camera ray data
         glUniform3fv(glGetUniformLocation(shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
         glUniform3fv(glGetUniformLocation(shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
-        // ambient color
-        glUniform3fv(glGetUniformLocation(shader.Program, "ambientColor"), 1, ambientColor);
+
         // update normal matrix of the model basing on current view matrix
         //normalmatrix = glm::inverseTranspose(glm::mat3(view * modelMatrix));
+
         // transform matrices
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
         glUniformMatrix4fv(glGetUniformLocation(shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalmatrix));
-        glUniform3fv(glGetUniformLocation(shader.Program, "specularColor"), 1, specularColor);
+
         // default stage: rendering
         glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
-        // passing sculpting params
+
+        // sculpting params
         glUniform1f(glGetUniformLocation(shader.Program, "radius"), radius);
         glUniform1f(glGetUniformLocation(shader.Program, "strength"), strength);
 
-        if (brush)
+        #pragma endregion UNIFORMS
+
+        if (brush) // BRUSHING BY TRANSFORM FEEDBACK
         {
-            /////
-            // TRANSFORM FEEDBACK START
             // Brush stage
             glUniform1i(glGetUniformLocation(shader.Program, "stage"), 1);
             // disabling the rasterization during brush stage
@@ -333,24 +405,22 @@ int main()
             // setting the target buffer of transform feedback computations
             glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, feedback[drawBuf]);
 
+            // start
             glBeginTransformFeedback(GL_TRIANGLES);
             glBindVertexArray(VAOs[1 - drawBuf]);
-            glDrawArrays(GL_TRIANGLES, 0, model.meshes[0].vertices.size()); // drawing vertices like points to call the vertex shader only once per-vertex
+            glDrawArrays(GL_TRIANGLES, 0, model.meshes[0].vertices.size()); // drawing vertices from each primitive (triangle)
             glBindVertexArray(0);
             glEndTransformFeedback();
             glDisable(GL_RASTERIZER_DISCARD);
+            // end
 
-            // Render + intersection stage
+            // Rendering + new intersection stage
             glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
+            //TODO: the intersection shader can't see -1 index when camera ray doesn't hit the model, check why
             model.Draw(VAOs[drawBuf]);
 
             // swap buffers for ping ponging
             drawBuf = 1 - drawBuf;
-
-            glFlush();
-            
-            // TRANSFORM FEEDBACK END
-            /////
         }
         else
         {
@@ -358,42 +428,10 @@ int main()
             model.Draw(VAOs[1 - drawBuf]);
         }
 
-        // a memory barrier for the ssbo is needed to guarantee that the further operations (here the brush shaders using the intersection info) will see this writes
-        //TODO: lo shader non vede l'indice -1 quando il raggio della camera non interseca il modello, capire perchè
-        //      il problema credo sia dovuto al fatto che viene sovrascritto in qualche modo oppure che non venga scritto quando non c'è più intersezione
-
-        //modelMatrix = glm::mat4(1.0f);
-        // rendering the camera ray for debugging
-        //ray.Draw(LINES);
-
-        /////
-        // DYNAMIC OBJECTS (FALLING CUBES + BULLETS)
-        /////
-        /*
-        glUniform3fv(objDiffuseLocation, 1, diffuseColor);
-
-        // model and normal matrices
-        glm::mat4 objModelMatrix;
-        glm::mat3 objNormalMatrix;
-
-        for(i = 1; i < num_side*num_side; i++ )
-        {
-            objModelMatrix = glm::translate(objModelMatrix, positions[i]);
-            objModelMatrix = glm::scale(objModelMatrix, cube_size);
-            objNormalMatrix = glm::inverseTranspose(glm::mat3(view*objModelMatrix));
-            glUniformMatrix4fv(glGetUniformLocation(object_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objModelMatrix));
-            glUniformMatrix3fv(glGetUniformLocation(object_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objNormalMatrix));
-
-            // renderizza il modello
-            cubeModel.Draw();
-            objModelMatrix = glm::mat4(1.0f);
-        }
-        */
-
         // gui cleaning
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        // Faccio lo swap tra back e front buffer
+        // swap between back and front buffer
         glfwSwapBuffers(window);
     }
 
@@ -411,6 +449,8 @@ int main()
     return 0;
 }
 
+#pragma region CALLBACKS
+
 //////////////////////////////////////////
 // If one of the WASD keys is pressed, the camera is moved accordingly (the code is in utils/camera.h)
 void apply_camera_movements()
@@ -423,7 +463,7 @@ void apply_camera_movements()
         camera.ProcessKeyboard(LEFT, deltaTime);
     if(keys[GLFW_KEY_D])
         camera.ProcessKeyboard(RIGHT, deltaTime);
-    lightPos0 = (camera.Position - model_pos) * 1.1f; // for light from the camera effect
+    pointLightPosition = (camera.Position - model_pos) * 1.1f; // for light from the camera effect
 }
 
 //////////////////////////////////////////
@@ -463,10 +503,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
         firstMouse = false;
     }
 
-    // we save the current cursor position in 2 global variables, in order to use the values in the keyboard callback function
-    cursorX = xpos;
-    cursorY = ypos;
-
     // offset of mouse cursor position
     GLfloat xoffset = xpos - lastX;
     GLfloat yoffset = lastY - ypos;
@@ -487,7 +523,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
         modelMatrix = glm::rotate(modelMatrix, -yoffset, camera.Right);
     }
 
-    // we pass the offset to the Camera class instance in order to update the rendering
+    // we pass the offset to the Camera class instance in order to update the rendering <- only if we want to move the camera with the mouse cursor
     //camera.ProcessMouseMovement(xoffset, yoffset);
 
 }
@@ -506,3 +542,5 @@ void mouse_key_callback(GLFWwindow* window, int button, int action, int mods)
     else
         rotation = false;
 }
+
+#pragma endregion CALLBACKS

@@ -1,15 +1,15 @@
 /*
+Real-time Graphics Programming - a.a. 2021/2022
+Master degree in Computer Science
+Universita' degli Studi di Milano
+
 Camera class
 - creation of a reference system for the camera
-- management of camera movement (FPS-style) using WASD keys and mouse movement
+- management of camera movement (limited FPS-style) using WASD keys
 
 N.B.) adaptation of https://github.com/JoeyDeVries/LearnOpenGL/blob/master/includes/learnopengl/camera.h
 
-author: Davide Gadia
-
-Real-time Graphics Programming - a.a. 2020/2021
-Master degree in Computer Science
-Universita' degli Studi di Milano
+author: Andrea Cipollini; based on RTGP course code by prof. Davide Gadia
 */
 
 #pragma once
@@ -40,7 +40,6 @@ struct Ray3
 {
     glm::vec3 origin;
     glm::vec3 direction;
-    // TODO: valutare più avanti se serve il parametro per la lunghezza
 };
 
 ///////////////////  CAMERA class ///////////////////////
@@ -56,19 +55,23 @@ public:
     glm::vec3 WorldUp; //  camera world UP vector -> needed for the initial computation of Right vector
     GLboolean onGround; // it defines if the camera is "anchored" to the ground, or if it strictly follows the current Front direction (even if this means that the camera "flies" in the scene)
     // N.B.) this version works only for flat terrains
+
     // Eular Angles
     GLfloat Yaw;
     GLfloat Pitch;
+
     // Camera options
     GLfloat MovementSpeed;
     GLfloat MouseSensitivity;
-    // Parameters to calculate Projection Matrix
+
+    // Parameters for Projection Matrix
     GLfloat Fov;
     GLuint ScreenWidth;
     GLuint ScreenHeight;
     GLfloat NearPlane;
     GLfloat FarPlane;
-    // Camera Ray parameter
+
+    // current Camera Ray
     Ray3 CameraRay;
 
     //////////////////////////////////////////
@@ -140,7 +143,7 @@ public:
     }
 
     //////////////////////////////////////////
-    // it updates the camera ray
+    // it updates the camera ray according to current mouse cursor position
     void UpdateCameraRay(GLfloat mouseX, GLfloat mouseY)
     {
         // we need the inverse matrix to pass from screen space to world space
@@ -149,7 +152,7 @@ public:
 
         glm::mat4 inverse = glm::inverse(projection * view);
 
-        // from screen space to normalized device space in [-1, 1] on u and v
+        // from screen space of mouse X and Y to normalized device space in [-1, 1] on u and v
         float u = mouseX / (float)this->ScreenWidth;
         float v = mouseY / (float)this->ScreenHeight;
         u = u * 2.0f - 1.0f;
@@ -164,7 +167,9 @@ public:
         out.y *= out.w;
         out.z *= out.w;
 
+        // the origin of the ray is the camera position (the ray comes out from the camera)
         this->CameraRay.origin = this->Position;
+        // the direction of the ray is the vector from the origin to the mouse cursor position in world coordinates (its position on the viewport in world coordinates)
         this->CameraRay.direction = glm::normalize(glm::vec3(out.x, out.y, out.z) - this->CameraRay.origin);
     }
 
