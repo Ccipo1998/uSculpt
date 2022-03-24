@@ -153,7 +153,7 @@ private:
         vector<GLuint> indices;
 
         // scale factor for inscription in a cube of 1x1x1
-        float scale_factor = this->InCube1x1x1(mesh);
+        float scale_factor = this->InUnitCube(mesh);
 
         for(GLuint i = 0; i < mesh->mNumVertices; i++)
         {
@@ -216,7 +216,8 @@ private:
     }
 
     // setting the mesh in a cube of 1x1x1 dimensions, for consistency with the sculpting params
-    float InCube1x1x1(aiMesh* mesh)
+    // return the scale factor to inscibe the mesh in a unit cube
+    float InUnitCube(aiMesh* mesh)
     {
         float maxX = numeric_limits<float>::min();
         float maxY = numeric_limits<float>::min();

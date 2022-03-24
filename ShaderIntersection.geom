@@ -37,7 +37,7 @@ out vec3 lightDir;
 out vec3 vNormal;
 out vec3 vViewPosition;
 out vec2 textCoords;
-out float hit;
+out vec3 hitColor;
 
 // output to transform feedback
 out vec3 newPosition;
@@ -168,10 +168,11 @@ void main() {
         // intersection test
         vec3 triangleNormal = TriangleNormal(gs_in[0].position, gs_in[1].position, gs_in[2].position);
         // if the current primitive is hitted by the camera ray, it will be red colored
-        hit = 0.0;
+        vec3 color = vec3(0.0, 0.0, 0.0);
         if (RayTriangleIntersection(triangleNormal))
-            hit = 1.0;
-
+            color = vec3(1.0, 0.0, 0.0);
+        hitColor = color;
+        
         // rendering
         // it is possible to use vertex data from the built-in variable gl_in, which is the previously setted gl_position variable (so in camera coordinates)
         // at last we need to send data to the fragment shader, for each vertex generated

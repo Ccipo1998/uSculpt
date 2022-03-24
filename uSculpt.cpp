@@ -254,7 +254,7 @@ int main()
     #pragma region MODEL INIT
 
     // loading of an initial standard sphere mesh
-    Model model("models/sphere1000k.obj");
+    Model model("models/statue.obj");
 
     // Model and Normal transformation matrices for the model
     modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
@@ -270,6 +270,9 @@ int main()
     projection = camera.GetProjectionMatrix();
     // camera-ray functions for intersection (init)
     camera.UpdateCameraRay(0, 0);
+
+    // unit cube visualization for debugging
+    //Model UnitCube("models/cube.obj");
 
     #pragma region TRANSFORM FEEDBACK INIT
 
@@ -427,6 +430,8 @@ int main()
             // else i simply draw the model from the last computed buffer <- the drawBuf variable is not updated here
             model.Draw(VAOs[1 - drawBuf]);
         }
+
+        //UnitCube.Draw();
 
         // gui cleaning
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -28,7 +28,7 @@ in vec3 vViewPosition;
 // texture coordinates to apply a texture
 in vec2 textCoords;
 // input from geometry shader
-in float hit;
+in vec3 hitColor;
 
 // ambient, diffusive and specular components (passed from the application)
 uniform vec3 ambientColor;
@@ -241,9 +241,13 @@ void main(void)
 {
     // we call the pointer function Illumination_Model():
     // the subroutine selected in the main application will be called and executed
-    vec3 illColor = Illumination_Model();
+    
     // if the fragment is in the area of the hitted triangle -> we color it in red
-    vec3 color = vec3(max(1.0 * hit, illColor.x), min(1.0 - 1.0 * hit, illColor.y), min(1.0 - 1.0 * hit, illColor.z));
+    vec3 color = vec3(0.0, 0.0, 0.0);
+    if (hitColor != vec3(0.0, 0.0, 0.0))
+        color = hitColor;
+    else
+        color = Illumination_Model();
   
     colorFrag = vec4(color, 1.0);
 }
