@@ -82,7 +82,7 @@ float GaussianDistribution(vec3 origin, vec3 position, float strength, float rad
   float stdDev = 1.5;
 
   float N = 1.0 / ((stdDev * stdDev * stdDev) * sqrt((2.0 * pi) * (2.0 * pi) * (2.0 * pi)));
-  N = N * (strength * 0.2);
+  N = N * (strength * 0.2 * radius);
   float dx = (origin.x - position.x) * 4.0 / radius;
   float dy = (origin.y - position.y) * 4.0 / radius;
   float dz = (origin.z - position.z) * 4.0 / radius;
@@ -104,15 +104,13 @@ void GaussianBrush()
 
   // radius length + offset
   float expandedRadius = radius + RadiusOffset(radius, strength);
-  // current vertex position without transformations added
-  vec3 staticCurrentVertexPosition = (inverse(modelMatrix) * vec4(intersection.point, 1.0)).xyz;
   // current intersection normal without transformations added
   vec3 staticCurrentIntersectionNormal = (inverse(modelMatrix) * vec4(intersection.normal, 1.0)).xyz;
   // current intersection point without transformations added
   vec3 staticCurrentIntersectionPoint = (inverse(modelMatrix) * vec4(intersection.point, 1.0)).xyz;
 
   // position updated if a primitive is hitted and the current vertex is in the brushing action area
-  if (intersection.primitiveIndex != -1 && length(position - staticCurrentVertexPosition) < (expandedRadius))
+  if (intersection.primitiveIndex != -1 && length(position - staticCurrentIntersectionPoint) < (expandedRadius))
   {
     // we have the intersection and the current vertex is inside the radius of the stroke
     vs_out.position = position + staticCurrentIntersectionNormal * GaussianDistribution(staticCurrentIntersectionPoint, position, strength, radius);

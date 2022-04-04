@@ -327,7 +327,7 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ImGui::Begin("Sculpting parameters"); 
-        ImGui::SliderFloat("Radius", &radius, 0.1f, 0.5f);
+        ImGui::SliderFloat("Radius", &radius, 0.01f, 0.5f);
         ImGui::SliderFloat("Strength", &strength, 0.1f, 3.0f);
         ImGui::End();
         ImGui::Render();
