@@ -254,7 +254,7 @@ int main()
     #pragma region MODEL INIT
 
     // loading of an initial standard sphere mesh
-    Model model("models/statue.obj");
+    Model model("models/sphere1000k.obj");
 
     // Model and Normal transformation matrices for the model
     modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
@@ -521,11 +521,12 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     yoffset *= 0.01f;
     if (rotation)
     {
-        // TODO: provare la scomposizione della retta di rotazione in angolo rispetto agli assi x, y, z -> così forse la rotazione viene corretta
-        //glm::vec3 rotAxis = (camera.Up * xoffset)
-        //float xcomponent = 
-        modelMatrix = glm::rotate(modelMatrix, xoffset, camera.Up);
-        modelMatrix = glm::rotate(modelMatrix, -yoffset, camera.Right);
+        // the rotation is applied to the model but not to the camera position -> rotation axis remains fixed and it not rotate with the model
+        // otherwise the rotation axis is always in the same direction compared to the model rotation
+        glm::vec4 inverseUp = glm::inverse(modelMatrix) * glm::vec4(camera.Up.x, camera.Up.y, camera.Up.z, 1.0f);
+        glm::vec4 inverseRight = glm::inverse(modelMatrix) * glm::vec4(camera.Right.x, camera.Right.y, camera.Right.z, 1.0f);
+        modelMatrix = glm::rotate(modelMatrix, xoffset, glm::vec3(inverseUp.x, inverseUp.y, inverseUp.z));
+        modelMatrix = glm::rotate(modelMatrix, -yoffset, glm::vec3(inverseRight.x, inverseRight.y, inverseRight.z));
     }
 
     // we pass the offset to the Camera class instance in order to update the rendering <- only if we want to move the camera with the mouse cursor
