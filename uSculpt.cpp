@@ -264,7 +264,9 @@ int main()
     #pragma endregion MODEL INIT
 
     // the choose Shader Program for the objects used in the application
-    Shader shader = Shader("ShaderBrushing.vert", "ShaderRendering.frag", "ShaderIntersection.geom");
+    vector<GLchar*> computeShaders;
+    computeShaders.push_back("ShaderBrush.comp");
+    Shader shader = Shader("ShaderBrushing.vert", "ShaderRendering.frag", computeShaders);
 
     // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
     projection = camera.GetProjectionMatrix();
@@ -275,14 +277,14 @@ int main()
     //Model UnitCube("models/cube.obj");
 
     #pragma region TRANSFORM FEEDBACK INIT
-
+    /*
     // buffer objects for transform feedback and SSBO
     GLuint VAOs[2], feedback[2], vertices[2], inters[2];
     model.meshes[0].InitMeshUpdate(VAOs, feedback, vertices, inters);
 
     // switch between input and output for transform feedback and rendering
     int drawBuf = 1;
-
+    */
     #pragma endregion TRANSFORM FEEDBACK INIT
 
     #pragma region GUI INIT

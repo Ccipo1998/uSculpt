@@ -1,0 +1,56 @@
+/*
+Compute Shader for brushing operations on mesh
+
+author: Andrea Cipollini
+*/
+
+#version 460 core
+
+// 128 thread for each block
+layout(local_size_x = 128) in;
+
+// vertices coordinates input
+layout(std430, binding = 0) buffer Vertices
+{
+    vec3 Positions[];
+};
+
+// intersection data input
+layout(std430, binding = 1) buffer Intersection
+{
+    vec3 IntersectionPosition;
+    vec3 IntersectionNormal;
+    int IntersectedPrimitive;
+};
+
+// uniforms
+uniform float Strength;
+uniform float Radius;
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    GaussianBrush(idx);
+}
+
+void GaussianBrush(uint idx)
+{
+    Positions[idx] = Positions[idx] + IntersectionNormal * GaussianDistribution(IntersectionPosition, Positions[idx], Strength, Radius);
+}
+
+// Gaussian Distribution function applied to a pair of vertices with distribution height = strength and distribution "range" = radius
+float GaussianDistribution(vec3 origin, vec3 position, float strength, float radius)
+{
+  float pi = 3.1415926535;
+  float stdDev = 1.5;
+
+  float N = 1.0 / ((stdDev * stdDev * stdDev) * sqrt((2.0 * pi) * (2.0 * pi) * (2.0 * pi)));
+  N = N * (strength * 0.2 * radius);
+  float dx = (origin.x - position.x) * 4.0 / radius;
+  float dy = (origin.y - position.y) * 4.0 / radius;
+  float dz = (origin.z - position.z) * 4.0 / radius;
+  float E = ((dx * dx) + (dy * dy) + (dz * dz)) / (2 * stdDev * stdDev);
+  
+  return N * exp(-E);
+}
+
