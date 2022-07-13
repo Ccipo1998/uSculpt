@@ -43,6 +43,21 @@ uniform mat4 NormalMatrix;
 // the position of the point light is passed as uniform -> ( N. B.) with more lights, and of different kinds, the shader code must be modified with a for cycle, with different treatment of the source lights parameters (directions, position, cutoff angle for spot lights, etc)
 uniform vec3 PointLightPosition;
 
+// outputs to fragment shader
+
+// vertex position in View Coordinates
+out vec3 vPosition;
+// light direction in View Coordinates
+out vec3 vLightDir;
+// vertex normal transformed for fragment shader
+out vec3 fNormal;
+// vertex tangent in View Coordinates
+out vec3 vTangent;
+// vertex bitangent in View Coordinates
+out vec3 vBitangent;
+// texture coordinates
+out vec2 fTextCoords;
+
 void main()
 {
     // vertex transformations to Canonical View Volume
@@ -56,6 +71,19 @@ void main()
     // vertex position in Normalized Device Coordinates (projection transformation)
     gl_Position = ProjectionMatrix * mvPosition;
 
-    // normal, tangent and bitangent transformations in View Coordinates
+    // light direction in View Coordinates
+    vec4 vPointLightPosition = ViewMatrix * vec4(PointLightPosition, 1.0);
+    vLightDir = vPointLightPosition.xyz - mvPosition.xyz;
+
+    // position passed in View Coordinates to fragment shader
+    vPosition = -mvPosition.xyz;
+
+    // normal, tangent and bitangent -> application of model transformations
+    //vNormal = (ViewMatrix * (ModelMatrix * vec4(Normal, 1.0))).xyz;
+    fNormal = normalize((ModelMatrix * NormalMatrix * vec4(Normal, 1.0)).xyz);
+    //vTangent = ...
+    //vBitangent = ...
     
+    // texture coordinates simply passed to fragment shader
+    fTextCoords = TextCoords;
 }

@@ -165,154 +165,24 @@ public:
         glBindVertexArray(0);
     }
 
-    // config of everything needed to perform GPU-only mesh update by ping-ponging Transform Feedback
-    void InitMeshUpdate(GLuint* VAOs, GLuint* TBOs, GLuint* VBOs, GLuint* SSBO)
+    // bind mesh data on GPU shader buffer
+    void InitMeshUpdate()
     {
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this->VAO);
+        //glBufferData(GL_SHADER_STORAGE_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_DRAW);
+
         /*
-                                        |---------------->
-        ping-ponging technique:     first step      second step
-                                        <----------------|
-            
-            where:
+        vector<glm::vec3> positions;
+        for (int i = 0; i < this->vertices.size(); i++)
+        {
+            positions.push_back(this->vertices[i].Position);
+        }
 
-                first step:
-
-                    |----------| write computations from VAO1 data to VAO2 buffer  |----------|
-                    |   VAO1   | ------------------------------------------------> |   VAO2   |
-                    |----------|                    (brush)                        |----------|
-                                                                                        |
-                                                                                        | read VAO2 to rendering new vertices
-                                                                                        |               (rendering)
-                                                                                        V
-                                                                                   |----------|
-                                                                                   |  window  |
-                                                                                   |----------|
-                
-                second step:
-
-                    |----------| write computations from VAO2 data to VAO1 buffer  |----------|
-                    |   VAO1   | <------------------------------------------------ |   VAO2   | (now VAO2 contains the new vertices previously computed)
-                    |----------|                    (brush)                        |----------|
-                         |
-                         | read VAO1 to rendering new vertices
-                         |               (rendering)
-                         V
-                    |----------|
-                    |  window  |
-                    |----------|
-
+        GLuint temp;
+        glGenBuffers(1, &temp);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, temp);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, positions.size() * sizeof(glm::vec3), &positions[0], GL_DYNAMIC_DRAW);
         */
-
-        // we need a single element object: we are not gonna modify the topology of the mesh
-        GLuint EBO;
-
-        // creating buffer objects:
-        // - first VAO for vertex array attributes structure
-        // - first TBO for Transform Feedback input/output
-        // - EBO for rendering triangles
-        // - first VBO for vertex data
-        glGenVertexArrays(1, &VAOs[0]);
-        glGenBuffers(1, &TBOs[0]);
-        glGenBuffers(1, &VBOs[0]);
-        glGenBuffers(1, &EBO);
-
-        // first VAO setup
-        glBindVertexArray(VAOs[0]);
-        // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
-        glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
-        glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_COPY);
-
-        // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_DYNAMIC_COPY);
-
-        // setup the first feedback object
-        glGenTransformFeedbacks(1, &TBOs[0]);
-
-        // setup the first link TBO1<->VBO1
-        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TBOs[0]);
-        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, VBOs[0]);
-
-        // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
-        // vertex positions
-        // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
-        // Normals
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
-        // Texture Coordinates
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
-        // Tangent
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
-        // Bitangent
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
-
-        // end of the first VAO
-        glBindVertexArray(0);
-
-        // creating buffer objects:
-        // - second VAO for vertex array attributes structure
-        // - second TBO for Transform Feedback input/output
-        // - EBO for rendering triangles
-        // - second VBO for vertex data
-        glGenVertexArrays(1, &VAOs[1]);
-        glGenBuffers(1, &TBOs[1]);
-        glGenBuffers(1, &VBOs[1]);
-        glGenBuffers(1, &EBO);
-
-        // second VAO setup
-        glBindVertexArray(VAOs[1]);
-        // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
-        glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-        glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_COPY); // double copy of the data for first rendering in not-brushing stage
-
-        // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_DYNAMIC_COPY);
-
-        // setup the second feedback object
-        glGenTransformFeedbacks(1, &TBOs[1]);
-
-        // setup the second link TBO2<->VBO2
-        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, TBOs[1]);
-        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, VBOs[1]);
-
-        // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
-        // vertex positions
-        // these will be the positions to use in the layout qualifiers in the shaders ("layout (location = ...)"")
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
-        // Normals
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
-        // Texture Coordinates
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
-        // Tangent
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Tangent));
-        // Bitangent
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
-
-        // end of the second VAO
-        glBindVertexArray(0);
-
-        // Shader Storage Buffer Object initialization
-        // shared buffer object between the shaders to use the same GPU memory:
-        //      so the intersection data can be written and read from anywhere in the shaders
-        //      in fact we need to read the last intersection for brushing and write the next intersection
-        glGenBuffers(1, SSBO);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, *SSBO);
-        Intersection inter = Intersection {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), -1}; // default intersection -> no intersection
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Intersection), &inter, GL_DYNAMIC_COPY); // data dimension
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, *SSBO);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
     }
 
 private:
@@ -337,10 +207,10 @@ private:
         glBindVertexArray(this->VAO);
         // we copy data in the VBO - we must set the data dimension, and the pointer to the structure cointaining the data
         glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
-        glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_DRAW);
         // we copy data in the EBO - we must set the data dimension, and the pointer to the structure cointaining the data
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_DYNAMIC_DRAW);
 
         // we set in the VAO the pointers to the different vertex attributes (with the relative offsets inside the data structure)
         // vertex positions

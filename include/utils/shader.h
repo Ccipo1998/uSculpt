@@ -89,10 +89,6 @@ public:
         glAttachShader(this->Program, vertex);
         glAttachShader(this->Program, fragment);
 
-        // just before linking the shader, the relationship between buffers and shader output variables is defined
-        const char* outputNames[] = { "newPosition", "newNormal", "newTexCoords", "newTangent", "newBitangent" };
-        glTransformFeedbackVaryings(this->Program, 5, outputNames, GL_INTERLEAVED_ATTRIBS);
-
         glLinkProgram(this->Program);
         // check linking errors
         checkCompileErrors(this->Program, "PROGRAM");
@@ -192,112 +188,58 @@ public:
         glDeleteShader(geometry);
     }
 
-    // constructor
-    Shader(const GLchar* vertexPath, const GLchar* fragmentPath, vector<GLchar*>& computePath)
+    // Compute Shader constructor
+    Shader(GLchar* computePath)
     {
         // Step 1: we retrieve shaders source code from provided filepaths
-        string vertexCode;
-        string fragmentCode;
-        vector<string> computeCode;
-        ifstream vShaderFile;
-        ifstream fShaderFile;
+        string computeCode;
         ifstream cShaderFile;
 
         // ensure ifstream objects can throw exceptions:
-        vShaderFile.exceptions (ifstream::failbit | ifstream::badbit);
-        fShaderFile.exceptions (ifstream::failbit | ifstream::badbit);
         cShaderFile.exceptions (ifstream::failbit | ifstream::badbit);
         try
         {
-            // Open files
-            vShaderFile.open(vertexPath);
-            fShaderFile.open(fragmentPath);
-            
-            stringstream vShaderStream, fShaderStream, cShaderStream;
+            stringstream cShaderStream;
+
+            // open file
+            cShaderFile.open(computePath);
+
             // Read file's buffer contents into streams
-            vShaderStream << vShaderFile.rdbuf();
-            fShaderStream << fShaderFile.rdbuf();
-            
+            cShaderStream << cShaderFile.rdbuf();
+
             // close file handlers
-            vShaderFile.close();
-            fShaderFile.close();
-            
+            cShaderFile.close();
+
             // Convert stream into string
-            vertexCode = vShaderStream.str();
-            fragmentCode = fShaderStream.str();
-
-            // compute shaders
-            for (int i = 0; i < computePath.size(); i++)
-            {
-                // open file
-                cShaderFile.open(computePath[i]);
-
-                // Read file's buffer contents into streams
-                cShaderStream << cShaderFile.rdbuf();
-
-                // close file handlers
-                cShaderFile.close();
-
-                // Convert stream into string
-                computeCode.push_back(cShaderStream.str());
-            }
+            computeCode = cShaderStream.str();
         }
         catch (ifstream::failure e)
         {
-            cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << endl;
+            cout << "ERROR::COMPUTE_SHADER::FILE_NOT_SUCCESFULLY_READ" << endl;
         }
-
-        // Convert strings to char pointers
-        const GLchar* vShaderCode = vertexCode.c_str();
-        const GLchar * fShaderCode = fragmentCode.c_str();
 
         // Shader Program creation
         this->Program = glCreateProgram();
 
         // Steps 2,3: shader compilation + link to Shader Program
-        GLuint vertex, fragment;
-        vector<GLuint> compute;
-
-        // Vertex Shader
-        vertex = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex, 1, &vShaderCode, NULL);
-        glCompileShader(vertex);
-        // check compilation errors
-        checkCompileErrors(vertex, "VERTEX");
-        glAttachShader(this->Program, vertex);
-
-        // Fragment Shader
-        fragment = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment, 1, &fShaderCode, NULL);
-        glCompileShader(fragment);
-        // check compilation errors
-        checkCompileErrors(fragment, "FRAGMENT");
-        glAttachShader(this->Program, fragment);
+        GLuint compute;
 
         // Compute Shaders
         const GLchar* cShaderCode;
-        for (int i = 0; i < computePath.size(); i++)
-        {
-            cShaderCode = computeCode[i].c_str();
-            compute.push_back(glCreateShader(GL_COMPUTE_SHADER));
-            glShaderSource(compute[i], 1, &cShaderCode, NULL);
-            glCompileShader(compute[i]);
-            // check compilation errors
-            checkCompileErrors(compute[i], "COMPUTE");
-            glAttachShader(this->Program, compute[i]);
-        }
+        cShaderCode = computeCode.c_str();
+        compute = glCreateShader(GL_COMPUTE_SHADER);
+        glShaderSource(compute, 1, &cShaderCode, NULL);
+        glCompileShader(compute);
+        // check compilation errors
+        checkCompileErrors(compute, "COMPUTE");
+        glAttachShader(this->Program, compute);
 
         glLinkProgram(this->Program);
         // check linking errors
         checkCompileErrors(this->Program, "PROGRAM");
 
         // Step 4: we delete the shaders because they are linked to the Shader Program, and we do not need them anymore
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
-        for (int i = 0; i < computePath.size(); i++)
-        {
-            glDeleteShader(compute[i]);
-        }
+        glDeleteShader(compute);
     }
 
     //////////////////////////////////////////

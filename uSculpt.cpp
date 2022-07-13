@@ -254,7 +254,7 @@ int main()
     #pragma region MODEL INIT
 
     // loading of an initial standard sphere mesh
-    Model model("models/sphere1000k.obj");
+    Model model("models/sphere.obj");
 
     // Model and Normal transformation matrices for the model
     modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
@@ -264,9 +264,11 @@ int main()
     #pragma endregion MODEL INIT
 
     // the choose Shader Program for the objects used in the application
-    vector<GLchar*> computeShaders;
-    computeShaders.push_back("ShaderBrush.comp");
-    Shader shader = Shader("ShaderBrushing.vert", "ShaderRendering.frag", computeShaders);
+    //Shader shader = Shader("ShaderBrushing.vert", "ShaderRendering.frag");
+    Shader renderingShader = Shader("ShaderVertex.vert", "ShaderFragment.frag");
+
+    // compute shaders for brushing operations
+    Shader brushingShader = Shader("ShaderBrush.comp");
 
     // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
     projection = camera.GetProjectionMatrix();
@@ -286,6 +288,9 @@ int main()
     int drawBuf = 1;
     */
     #pragma endregion TRANSFORM FEEDBACK INIT
+
+    // mesh data bind on GPU shaders
+    model.meshes[0].InitMeshUpdate();
 
     #pragma region GUI INIT
 
@@ -358,49 +363,75 @@ int main()
         // Mouse ray update for intersection test
         camera.UpdateCameraRay(lastX, lastY);
 
+        // when brush command is called -> intersection shader + brushing shader, then rendering
+        if (brush)
+        {
+            // select the shader
+            brushingShader.Use();
+
+            // uniforms
+
+            // sculpting params
+            glUniform1f(glGetUniformLocation(brushingShader.Program, "Radius"), radius);
+            glUniform1f(glGetUniformLocation(brushingShader.Program, "Strength"), strength);
+
+            // temp intersection data
+            glUniform3fv(glGetUniformLocation(brushingShader.Program, "IntersectionPoint"), 1, glm::value_ptr(model.meshes[0].vertices[0].Position));
+            glUniform3fv(glGetUniformLocation(brushingShader.Program, "IntersectionNormal"), 1, glm::value_ptr(model.meshes[0].vertices[0].Normal));
+
+            // vertices number
+            glUniform1ui(glGetUniformLocation(brushingShader.Program, "VerticesNumber"), model.meshes[0].vertices.size());
+
+            glDispatchCompute(4, 1, 1);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
         // select the shader to use
-        shader.Use();
+        renderingShader.Use();
 
         // We search inside the Shader Program the name of a subroutine, and we get the numerical index
-        GLuint index = glGetSubroutineIndex(shader.Program, GL_FRAGMENT_SHADER, "GGX");
+        GLuint index = glGetSubroutineIndex(renderingShader.Program, GL_FRAGMENT_SHADER, "GGX");
         // we activate the subroutine using the index
         glUniformSubroutinesuiv( GL_FRAGMENT_SHADER, 1, &index);
 
         #pragma region UNIFORMS
 
         // projection and view matrix for intersection and rendering
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(renderingShader.Program, "ProjectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(renderingShader.Program, "ViewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
 
         // colors, light and illumination
-        glUniform3fv(glGetUniformLocation(shader.Program, "diffuseColor"), 1, diffuseColor);
-        glUniform3fv(glGetUniformLocation(shader.Program, "pointLightPosition"), 1, glm::value_ptr(pointLightPosition));
-        glUniform1f(glGetUniformLocation(shader.Program, "Kd"), Kd);
-        glUniform1f(glGetUniformLocation(shader.Program, "alpha"), alpha);
-        glUniform1f(glGetUniformLocation(shader.Program, "F0"), F0);
-        glUniform3fv(glGetUniformLocation(shader.Program, "ambientColor"), 1, ambientColor);
-        glUniform3fv(glGetUniformLocation(shader.Program, "specularColor"), 1, specularColor);
+        glUniform3fv(glGetUniformLocation(renderingShader.Program, "diffuseColor"), 1, diffuseColor);
+        glUniform3fv(glGetUniformLocation(renderingShader.Program, "PointLightPosition"), 1, glm::value_ptr(pointLightPosition));
+        glUniform1f(glGetUniformLocation(renderingShader.Program, "Kd"), Kd);
+        glUniform1f(glGetUniformLocation(renderingShader.Program, "alpha"), alpha);
+        glUniform1f(glGetUniformLocation(renderingShader.Program, "F0"), F0);
+        glUniform3fv(glGetUniformLocation(renderingShader.Program, "ambientColor"), 1, ambientColor);
+        glUniform3fv(glGetUniformLocation(renderingShader.Program, "specularColor"), 1, specularColor);
 
         // camera ray data
-        glUniform3fv(glGetUniformLocation(shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
-        glUniform3fv(glGetUniformLocation(shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
+        //glUniform3fv(glGetUniformLocation(shader.Program, "rayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
+        //glUniform3fv(glGetUniformLocation(shader.Program, "rayDir"), 1, glm::value_ptr(camera.CameraRay.direction));
 
         // update normal matrix of the model basing on current view matrix
         //normalmatrix = glm::inverseTranspose(glm::mat3(view * modelMatrix));
 
         // transform matrices
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
-        glUniformMatrix4fv(glGetUniformLocation(shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(normalmatrix));
+        glUniformMatrix4fv(glGetUniformLocation(renderingShader.Program, "ModelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+        glUniformMatrix4fv(glGetUniformLocation(renderingShader.Program, "NormalMatrix"), 1, GL_FALSE, glm::value_ptr(normalmatrix));
 
         // default stage: rendering
-        glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
+        //glUniform1i(glGetUniformLocation(shader.Program, "stage"), 2);
 
         // sculpting params
-        glUniform1f(glGetUniformLocation(shader.Program, "radius"), radius);
-        glUniform1f(glGetUniformLocation(shader.Program, "strength"), strength);
+        glUniform1f(glGetUniformLocation(renderingShader.Program, "radius"), radius);
+        glUniform1f(glGetUniformLocation(renderingShader.Program, "strength"), strength);
 
         #pragma endregion UNIFORMS
 
+        model.Draw();
+
+        /*
         if (brush) // BRUSHING BY TRANSFORM FEEDBACK
         {
             // Brush stage
@@ -432,6 +463,7 @@ int main()
             // else i simply draw the model from the last computed buffer <- the drawBuf variable is not updated here
             model.Draw(VAOs[1 - drawBuf]);
         }
+        */
 
         //UnitCube.Draw();
 
@@ -444,7 +476,7 @@ int main()
 
     // when I exit from the graphics loop, it is because the application is closing
     // we delete the Shader Programs
-    shader.Delete();
+    renderingShader.Delete();
 
     // gui delete
     ImGui_ImplOpenGL3_Shutdown();

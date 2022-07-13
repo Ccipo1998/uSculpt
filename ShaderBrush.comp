@@ -6,15 +6,25 @@ author: Andrea Cipollini
 
 #version 460 core
 
-// 128 thread for each block
-layout(local_size_x = 128) in;
-
-// vertices coordinates input
-layout(std430, binding = 0) buffer Vertices
+struct Vertex
 {
-    vec3 Positions[];
+    vec3 Position;
+    vec3 Normal;
+    vec2 TextCoords;
+    vec3 Tangent;
+    vec3 Bitangent;
 };
 
+// 128 thread for each block
+layout(local_size_x = 570) in;
+
+// vertices coordinates input
+layout(std430, binding = 0) buffer MeshDataInput
+{
+    Vertex Vertices[];
+};
+
+/*
 // intersection data input
 layout(std430, binding = 1) buffer Intersection
 {
@@ -22,21 +32,16 @@ layout(std430, binding = 1) buffer Intersection
     vec3 IntersectionNormal;
     int IntersectedPrimitive;
 };
+*/
 
 // uniforms
 uniform float Strength;
 uniform float Radius;
+uniform uint VerticesNumber;
 
-void main()
-{
-    uint idx = gl_GlobalInvocationID.x;
-    GaussianBrush(idx);
-}
-
-void GaussianBrush(uint idx)
-{
-    Positions[idx] = Positions[idx] + IntersectionNormal * GaussianDistribution(IntersectionPosition, Positions[idx], Strength, Radius);
-}
+// temp uniforms
+uniform vec3 IntersectionPosition;
+uniform vec3 IntersectionNormal;
 
 // Gaussian Distribution function applied to a pair of vertices with distribution height = strength and distribution "range" = radius
 float GaussianDistribution(vec3 origin, vec3 position, float strength, float radius)
@@ -54,3 +59,26 @@ float GaussianDistribution(vec3 origin, vec3 position, float strength, float rad
   return N * exp(-E);
 }
 
+void GaussianBrush(uint idx)
+{
+    float dist = distance(Vertices[idx].Position, IntersectionPosition);
+    if (dist <= Radius)
+        Vertices[idx].Position = Vertices[idx].Position + IntersectionNormal * GaussianDistribution(IntersectionPosition, Vertices[idx].Position, Strength, Radius);
+}
+
+void UniformBrush(uint idx)
+{
+    float dist = length(Vertices[idx].Position - IntersectionPosition);
+    //if (dist <= Radius)
+    Vertices[idx].Position = Vertices[idx].Position + Vertices[idx].Normal * 0.0001;
+    //Vertices[idx].Position = Vertices[idx].Position
+    //Vertices[idx].Position = Vertices[idx].Position * 1.001;
+}
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    // index check
+    //if (idx < VerticesNumber)
+    UniformBrush(idx);
+}
