@@ -254,7 +254,7 @@ int main()
     #pragma region MODEL INIT
 
     // loading of an initial standard sphere mesh
-    Model model("models/sphere.obj");
+    Model model("models/sphere1000k.obj");
 
     // Model and Normal transformation matrices for the model
     modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
@@ -382,7 +382,7 @@ int main()
             // vertices number
             glUniform1ui(glGetUniformLocation(brushingShader.Program, "VerticesNumber"), model.meshes[0].vertices.size());
 
-            glDispatchCompute(4, 1, 1);
+            glDispatchCompute(ceil(model.meshes[0].vertices.size() / 1024), 1, 1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
 

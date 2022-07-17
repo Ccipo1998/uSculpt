@@ -24,7 +24,7 @@ layout (location = 0) in vec3 Position;
 // vertex normal in world coordinate
 layout (location = 1) in vec3 Normal;
 // u,v texture coordinates of the model
-layout (location = 2) in vec2 TextCoords;
+layout (location = 2) in vec2 TexCoords;
 // tangent direction in world coordinates
 layout (location = 3) in vec3 Tangent;
 // bitangent direction in world coordinates
@@ -56,7 +56,7 @@ out vec3 vTangent;
 // vertex bitangent in View Coordinates
 out vec3 vBitangent;
 // texture coordinates
-out vec2 fTextCoords;
+out vec2 fTexCoords;
 
 void main()
 {
@@ -85,5 +85,5 @@ void main()
     //vBitangent = ...
     
     // texture coordinates simply passed to fragment shader
-    fTextCoords = TextCoords;
+    fTexCoords = TexCoords;
 }

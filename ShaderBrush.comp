@@ -8,15 +8,16 @@ author: Andrea Cipollini
 
 struct Vertex
 {
-    vec3 Position;
-    vec3 Normal;
-    vec2 TextCoords;
-    vec3 Tangent;
-    vec3 Bitangent;
+    float[3] Position;
+    float[3] Normal;
+    float[2] TexCoords;
+    float[3] Tangent;
+    float[3] Bitangent;
+
 };
 
 // 128 thread for each block
-layout(local_size_x = 570) in;
+layout(local_size_x = 1024) in;
 
 // vertices coordinates input
 layout(std430, binding = 0) buffer MeshDataInput
@@ -59,26 +60,52 @@ float GaussianDistribution(vec3 origin, vec3 position, float strength, float rad
   return N * exp(-E);
 }
 
-void GaussianBrush(uint idx)
+vec3 GaussianBrush(vec3 position)
 {
-    float dist = distance(Vertices[idx].Position, IntersectionPosition);
+    /*
+    float dist = distance(position, IntersectionPosition);
     if (dist <= Radius)
-        Vertices[idx].Position = Vertices[idx].Position + IntersectionNormal * GaussianDistribution(IntersectionPosition, Vertices[idx].Position, Strength, Radius);
+    {
+        float displacement = GaussianDistribution(IntersectionPosition, position, Strength, Radius);
+        vec3 newPosition = position + IntersectionNormal * displacement;
+
+        return newPosition;
+    }
+    */
+    return position + IntersectionNormal * GaussianDistribution(IntersectionPosition, position, Strength, Radius);;
 }
 
-void UniformBrush(uint idx)
+vec3 UniformBrush(vec3 position, vec3 normal)
 {
-    float dist = length(Vertices[idx].Position - IntersectionPosition);
+    //float dist = length(Vertices[idx].Position - IntersectionPosition);
     //if (dist <= Radius)
-    Vertices[idx].Position = Vertices[idx].Position + Vertices[idx].Normal * 0.0001;
+    /*
+    vec3 position = vec3(Vertices[idx].Position[0], Vertices[idx].Position[1], Vertices[idx].Position[2]);
+    vec3 normal = vec3(Vertices[idx].Normal[0], Vertices[idx].Normal[1], Vertices[idx].Normal[2]);
+    position = position + normal * 0.0001;
+    Vertices[idx].Position[0] = position.x;
+    Vertices[idx].Position[1] = position.y;
+    Vertices[idx].Position[2] = position.z;
+    */
+    return position + normal * 0.0001;
     //Vertices[idx].Position = Vertices[idx].Position
     //Vertices[idx].Position = Vertices[idx].Position * 1.001;
 }
 
 void main()
 {
+    // vertex data
     uint idx = gl_GlobalInvocationID.x;
+    vec3 position = vec3(Vertices[idx].Position[0], Vertices[idx].Position[1], Vertices[idx].Position[2]);
+    vec3 normal = vec3(Vertices[idx].Normal[0], Vertices[idx].Normal[1], Vertices[idx].Normal[2]);
+
     // index check
     //if (idx < VerticesNumber)
-    UniformBrush(idx);
+    //vec3 newPosition = UniformBrush(position, normal);
+    vec3 newPosition = GaussianBrush(position);
+
+    // assignement of new values
+    Vertices[idx].Position[0] = newPosition.x;
+    Vertices[idx].Position[1] = newPosition.y;
+    Vertices[idx].Position[2] = newPosition.z;
 }
