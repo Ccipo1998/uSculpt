@@ -16,13 +16,26 @@ struct Vertex
 
 };
 
+struct Intersection
+{
+    float[3] Position;
+    float[3] Normal;
+    bool hit;
+    uint idxv0, idxv1, idxv2;
+};
+
 // 128 thread for each block
-layout(local_size_x = 1024) in;
+layout(local_size_x = 128) in;
 
 // vertices coordinates input
 layout(std430, binding = 0) buffer MeshDataInput
 {
     Vertex Vertices[];
+};
+
+layout(std430, binding = 2) buffer IntersectionDataOutput
+{
+    Intersection IntersectionData;
 };
 
 /*
@@ -41,8 +54,8 @@ uniform float Radius;
 uniform uint VerticesNumber;
 
 // temp uniforms
-uniform vec3 IntersectionPosition;
-uniform vec3 IntersectionNormal;
+//uniform vec3 IntersectionPosition;
+//uniform vec3 IntersectionNormal;
 
 // Gaussian Distribution function applied to a pair of vertices with distribution height = strength and distribution "range" = radius
 float GaussianDistribution(vec3 origin, vec3 position, float strength, float radius)
@@ -72,7 +85,10 @@ vec3 GaussianBrush(vec3 position)
         return newPosition;
     }
     */
-    return position + IntersectionNormal * GaussianDistribution(IntersectionPosition, position, Strength, Radius);;
+    vec3 interNormal = vec3(IntersectionData.Normal[0], IntersectionData.Normal[1], IntersectionData.Normal[2]);
+    vec3 interPosition = vec3(IntersectionData.Position[0], IntersectionData.Position[1], IntersectionData.Position[2]);
+
+    return position + interNormal * GaussianDistribution(interPosition, position, Strength, Radius);;
 }
 
 vec3 UniformBrush(vec3 position, vec3 normal)
@@ -94,13 +110,17 @@ vec3 UniformBrush(vec3 position, vec3 normal)
 
 void main()
 {
-    // vertex data
+    // index
     uint idx = gl_GlobalInvocationID.x;
+    
+    // index check
+    if (idx >= VerticesNumber)
+        return;
+    
+    // vertex data
     vec3 position = vec3(Vertices[idx].Position[0], Vertices[idx].Position[1], Vertices[idx].Position[2]);
     vec3 normal = vec3(Vertices[idx].Normal[0], Vertices[idx].Normal[1], Vertices[idx].Normal[2]);
 
-    // index check
-    //if (idx < VerticesNumber)
     //vec3 newPosition = UniformBrush(position, normal);
     vec3 newPosition = GaussianBrush(position);
 

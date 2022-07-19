@@ -270,6 +270,9 @@ int main()
     // compute shaders for brushing operations
     Shader brushingShader = Shader("ShaderBrush.comp");
 
+    // compute shader for intersection tests
+    Shader intersectionShader = Shader("ShaderIntersection.comp");
+
     // Projection matrix: FOV angle, aspect ratio, near and far planes (all setted in camera class to retrieve the matrix if needed)
     projection = camera.GetProjectionMatrix();
     // camera-ray functions for intersection (init)
@@ -363,6 +366,31 @@ int main()
         // Mouse ray update for intersection test
         camera.UpdateCameraRay(lastX, lastY);
 
+        #pragma region INTERSECTION SHADER
+
+        // intersection shader
+        model.meshes[0].ResetIntersectionData();
+        intersectionShader.Use();
+        
+        // uniforms
+
+        // indices number
+        glUniform1ui(glGetUniformLocation(intersectionShader.Program, "IndicesNumber"), model.meshes[0].indices.size());
+
+        // model matrix for movements
+        glUniformMatrix4fv(glGetUniformLocation(intersectionShader.Program, "ModelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+
+        // camera ray data
+        glUniform3fv(glGetUniformLocation(intersectionShader.Program, "RayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
+        glUniform3fv(glGetUniformLocation(intersectionShader.Program, "RayDirection"), 1, glm::value_ptr(camera.CameraRay.direction));
+
+        glDispatchCompute(ceil((model.meshes[0].indices.size() / 3) / 128), 1, 1);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+        #pragma endregion INTERSECTION SHADER
+
+        #pragma region BRUSH SHADER
+
         // when brush command is called -> intersection shader + brushing shader, then rendering
         if (brush)
         {
@@ -376,15 +404,17 @@ int main()
             glUniform1f(glGetUniformLocation(brushingShader.Program, "Strength"), strength);
 
             // temp intersection data
-            glUniform3fv(glGetUniformLocation(brushingShader.Program, "IntersectionPoint"), 1, glm::value_ptr(model.meshes[0].vertices[0].Position));
-            glUniform3fv(glGetUniformLocation(brushingShader.Program, "IntersectionNormal"), 1, glm::value_ptr(model.meshes[0].vertices[0].Normal));
+            //glUniform3fv(glGetUniformLocation(brushingShader.Program, "IntersectionPoint"), 1, glm::value_ptr(model.meshes[0].vertices[0].Position));
+            //glUniform3fv(glGetUniformLocation(brushingShader.Program, "IntersectionNormal"), 1, glm::value_ptr(model.meshes[0].vertices[0].Normal));
 
             // vertices number
             glUniform1ui(glGetUniformLocation(brushingShader.Program, "VerticesNumber"), model.meshes[0].vertices.size());
 
-            glDispatchCompute(ceil(model.meshes[0].vertices.size() / 1024), 1, 1);
+            glDispatchCompute(ceil(model.meshes[0].vertices.size() / 128), 1, 1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
+
+        #pragma endregion BRUSH SHADER
 
         // select the shader to use
         renderingShader.Use();
@@ -399,6 +429,7 @@ int main()
         // projection and view matrix for intersection and rendering
         glUniformMatrix4fv(glGetUniformLocation(renderingShader.Program, "ProjectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(renderingShader.Program, "ViewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniform1f(glGetUniformLocation(renderingShader.Program, "Radius"), radius);
 
         // colors, light and illumination
         glUniform3fv(glGetUniformLocation(renderingShader.Program, "diffuseColor"), 1, diffuseColor);

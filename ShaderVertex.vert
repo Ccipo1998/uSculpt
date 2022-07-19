@@ -15,6 +15,14 @@ author: Andrea Cipollini; based on RTGP course code by prof. Davide Gadia
 
 #version 460 core
 
+struct Intersection
+{
+    float[3] Position;
+    float[3] Normal;
+    bool hit;
+    uint v0, v1, v2;
+};
+
 // Vertex attributes in VAO
 
 // the numbers used for the location in the layout qualifier are the positions of the vertex attribute
@@ -30,6 +38,11 @@ layout (location = 3) in vec3 Tangent;
 // bitangent direction in world coordinates
 layout (location = 4) in vec3 Bitangent;
 
+layout(std430, binding = 2) buffer IntersectionDataOutput
+{
+    Intersection IntersectionData;
+};
+
 // Uniforms
 
 // model matrix
@@ -42,6 +55,8 @@ uniform mat4 ProjectionMatrix;
 uniform mat4 NormalMatrix;
 // the position of the point light is passed as uniform -> ( N. B.) with more lights, and of different kinds, the shader code must be modified with a for cycle, with different treatment of the source lights parameters (directions, position, cutoff angle for spot lights, etc)
 uniform vec3 PointLightPosition;
+// Radius of the current brush
+uniform float Radius;
 
 // outputs to fragment shader
 
@@ -57,6 +72,8 @@ out vec3 vTangent;
 out vec3 vBitangent;
 // texture coordinates
 out vec2 fTexCoords;
+// color for the intersected triangle
+out vec3 hitColor;
 
 void main()
 {
@@ -86,4 +103,19 @@ void main()
     
     // texture coordinates simply passed to fragment shader
     fTexCoords = TexCoords;
+
+    vec3 interPosition = vec3(IntersectionData.Position[0], IntersectionData.Position[1], IntersectionData.Position[2]);
+    float dist = distance(Position, interPosition);
+    if (IntersectionData.hit && dist <= (Radius / 100 * 80))
+        hitColor = vec3(1.0, 0.0, 0.0);
+    else
+        hitColor = vec3(0.0, 0.0, 0.0);
+
+    /*
+    // check if the vertex belongs to the intersected triangle
+    if (IntersectionData.hit && (IntersectionData.v0 == gl_VertexID || IntersectionData.v1 == gl_VertexID || IntersectionData.v2 == gl_VertexID))
+        hitColor = vec3(1.0, 0.0, 0.0);
+    else
+        hitColor = vec3(0.0, 0.0, 0.0);
+    */
 }

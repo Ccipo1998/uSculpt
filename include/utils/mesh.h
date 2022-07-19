@@ -52,9 +52,10 @@ enum RenderingType { TRIANGLES, LINES };
 // if the primitive index is equal to -1 -> there is not intersection
 struct Intersection
 {
-    glm::vec3 point;
-    glm::vec3 normal;
-    int primitiveIndex;
+    glm::vec3 Position;
+    glm::vec3 Normal;
+    bool hit;
+    GLuint idxv0, idxv1, idxv2;
 };
 
 /////////////////// MESH class ///////////////////////
@@ -169,6 +170,10 @@ public:
     void InitMeshUpdate()
     {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this->VAO);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this->EBO);
+
+        ResetIntersectionData();
+
         //glBufferData(GL_SHADER_STORAGE_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_DYNAMIC_DRAW);
 
         /*
@@ -185,10 +190,19 @@ public:
         */
     }
 
+    void ResetIntersectionData()
+    {
+        // create buffer object for intersection data
+        Intersection inter = {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), false, (GLuint)-1, (GLuint)-1, (GLuint)-1};
+        glGenBuffers(1, &this->IntersectionBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, IntersectionBuffer);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Intersection), &inter, GL_DYNAMIC_DRAW);
+    }
+
 private:
 
     // VBO and EBO
-    GLuint VBO, EBO;
+    GLuint VBO, EBO, IntersectionBuffer;
 
     //////////////////////////////////////////
     // buffer objects\arrays are initialized

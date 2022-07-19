@@ -1,0 +1,159 @@
+/*
+Compute Shader for calculating the intersection point between the cursor and the mesh
+
+author: Andrea Cipollini
+*/
+
+#version 460 core
+
+struct Vertex
+{
+    float[3] Position;
+    float[3] Normal;
+    float[2] TexCoords;
+    float[3] Tangent;
+    float[3] Bitangent;
+
+};
+
+struct Intersection
+{
+    float[3] Position;
+    float[3] Normal;
+    bool hit;
+    uint idxv0, idxv1, idxv2;
+};
+
+// 128 thread for each block
+layout(local_size_x = 128) in;
+
+// vertices coordinates input
+layout(std430, binding = 0) buffer MeshDataInput
+{
+    Vertex Vertices[];
+};
+
+layout(std430, binding = 1) buffer MeshPrimitivesIndices
+{
+    uint Indices[];
+};
+
+layout(std430, binding = 2) buffer IntersectionDataOutput
+{
+    Intersection IntersectionData;
+};
+
+// uniforms
+uniform uint IndicesNumber;
+uniform vec3 RayOrigin;
+uniform vec3 RayDirection;
+// model matrix
+uniform mat4 ModelMatrix;
+
+// ray-triangle intersection test
+// Möller–Trumbore intersection algorithm (from "Fast, Minimum Storage Ray/Triangle Intersection" paper by Tomas Möller and Ben Trumbore)
+// https://cadxfem.org/inf/Fast%20MinimumStorage%20RayTriangle%20Intersection.pdf
+Intersection RayTriangleIntersection(vec3 v0, vec3 v1, vec3 v2)
+{
+    // small value for numerical stability in directions test -> comparison between the determinant to a small interval around zero
+    float epsilon = 0.0000001;
+
+    // starting return struct
+    Intersection inter;
+    inter.hit = false;
+
+    // normal to triangle plane
+    vec3 triangleNormal = normalize(cross(v1 - v0, v2 - v0));
+
+    // directions test (culling test)
+    // if the dot is negative -> a direction faces the other one
+    // else the directions are perpendicular or parallel but with the same direction (i.e. the ray intersects the back of the triangle)
+    if (dot(RayDirection, triangleNormal) > epsilon)
+        return inter;
+    
+    // triangle edges
+    vec3 e1 = v1 - v0;
+    vec3 e2 = v2 - v0;
+    
+    // determinant calculation
+    // - to check if the ray lies on the triangle plane (culling test)
+    // - to calculate u
+    vec3 h = cross(RayDirection, e2);
+    float a = dot(e1, h); // determinant
+    // if determinant is near zero -> ray is on the plane of the triangle
+    if (a > -epsilon && a < epsilon)
+        return inter;
+
+    // inverse determinant
+    float f = 1.0 / a;
+    // distance from vert0 to ray origin
+    vec3 s = RayOrigin - v0;
+    // calculating u for test bounds
+    float u = f * dot(s, h);
+    // if u is outside the required range for the barycentric coordinate -> the interseciton point lies on the triangle plane but outside the triangle (culling test)
+    if (u < 0.0 || u > 1.0)
+        return inter;
+
+    // calculating v for test bounds
+    vec3 q = cross(s, e1);
+    float v = f * dot(RayDirection, q);
+    // if v is outside the required range for the barycentric coordinate -> the interseciton point lies on the triangle plane but outside the triangle (culling test)
+    if (v < 0.0 || u + v > 1.0)
+        return inter;
+
+    // in fact the requirements for barycentric coordinates are:
+    // - u >= 0
+    // - v >= 0
+    // - u + v <= 1
+
+    // here we have hitted the triangle surface -> we compute the parameter t which gives the distance on the ray from its origin to calculate the intersection point
+    float t = f * dot(e2, q);
+    if (t > epsilon)
+    {
+        vec3 intersectionPoint = RayOrigin + RayDirection * t; // world coordinates
+
+        inter.Position[0] = intersectionPoint.x;
+        inter.Position[1] = intersectionPoint.y;
+        inter.Position[2] = intersectionPoint.z;
+        inter.Normal[0] = triangleNormal.x;
+        inter.Normal[1] = triangleNormal.y;
+        inter.Normal[2] = triangleNormal.z;
+        inter.hit = true;
+    }
+    
+    return inter;
+}
+
+void main()
+{
+    // indices
+    uint idx = gl_GlobalInvocationID.x * 3;
+    
+    // index check
+    if (idx >= IndicesNumber)
+        return;
+
+    // primitive data
+    uint idv0, idv1, idv2;
+    idv0 = Indices[idx];
+    idv1 = Indices[idx + 1];
+    idv2 = Indices[idx + 2];
+    vec3 v0 = (ModelMatrix * vec4(Vertices[idv0].Position[0], Vertices[idv0].Position[1], Vertices[idv0].Position[2], 1.0)).xyz;
+    vec3 v1 = (ModelMatrix * vec4(Vertices[idv1].Position[0], Vertices[idv1].Position[1], Vertices[idv1].Position[2], 1.0)).xyz;
+    vec3 v2 = (ModelMatrix * vec4(Vertices[idv2].Position[0], Vertices[idv2].Position[1], Vertices[idv2].Position[2], 1.0)).xyz;
+
+    // intersection test
+    Intersection inter = RayTriangleIntersection(v0, v1, v2);
+
+    // synchronize intersection tests
+    barrier();
+
+    // only if there is an hit the shader writes the intersection data
+    if (inter.hit)
+    {
+        IntersectionData = inter;
+        IntersectionData.idxv0 = idv0;
+        IntersectionData.idxv1 = idv1;
+        IntersectionData.idxv2 = idv2;
+    }
+}

@@ -27,6 +27,8 @@ in vec3 vLightDir;
 in vec3 fNormal;
 // texture coordinates to apply a texture
 in vec2 fTextCoords;
+// hit color for the intersected triangle
+in vec3 hitColor;
 
 // ambient, diffusive and specular components (passed from the application)
 uniform vec3 ambientColor;
@@ -239,7 +241,7 @@ void main(void)
 {
     // we call the pointer function Illumination_Model():
     // the subroutine selected in the main application will be called and executed
-    vec3 color = Illumination_Model();
+    vec3 color = Illumination_Model() + hitColor;
   
     FragColor = vec4(color, 1.0);
 }
