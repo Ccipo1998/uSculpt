@@ -8,13 +8,10 @@
             "name": "cl.exe - Compila ed esegui il debug del file attivo",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/${fileBasenameNoExtension}.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${fileDirname}",
-            "environment": [],
-            "console": "externalTerminal",
-            "preLaunchTask": "C/C++: cl.exe compila il file attivo"
+            "program": "${workspaceFolder}/bin/uSculpt.exe",
+            "args": ["arg1", "arg2"],
+            "cwd": "${workspaceFolder}",
+            "environment": [{ "name": "config", "value": "Debug" }],
         }
     ]
 }

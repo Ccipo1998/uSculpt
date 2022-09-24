@@ -34,6 +34,12 @@ using namespace std;
 // we include the Mesh class, which manages the "OpenGL side" (= creation and allocation of VBO, VAO, EBO buffers) of the loading of models
 #include <utils/mesh.h>
 
+// include for hash map
+#include <unordered_map>
+
+// include for sets
+#include <set>
+
 /////////////////// MODEL class ///////////////////////
 class Model
 {
@@ -152,6 +158,12 @@ private:
         vector<Vertex> vertices;
         vector<GLuint> indices;
 
+        // neighborhood map for vertex's neighbours
+        unordered_map<glm::vec3, vector<GLuint>, GlmMap, GlmMap> Nmap;
+        // indices referring to the same vertex
+        unordered_map<glm::vec3, set<GLuint>, GlmMap, GlmMap> Vmap;
+        vector<GLuint> neighbours;
+
         // scale factor for inscription in a cube of 1x1x1
         float scale_factor = this->InUnitCube(mesh);
 
@@ -193,9 +205,18 @@ private:
                 vector.z = mesh->mBitangents[i].z;
                 vertex.Bitangent = vector;
             }
-            else{
+            else
+            {
                 vertex.TexCoords = glm::vec2(0.0f, 0.0f);
             }
+
+            // save indices of vertex duplicates
+            if (Vmap.find(vertex.Position) == Vmap.end())
+            {
+                Vmap[vertex.Position] = set<GLuint>();
+            }
+            Vmap[vertex.Position].insert(i);
+
             // we add the vertex to the list
             vertices.push_back(vertex);
         }
@@ -204,15 +225,99 @@ private:
             cout << "WARNING::ASSIMP:: MODEL WITHOUT UV COORDINATES -> TANGENT AND BITANGENT ARE = 0" << endl;
 
         // for each face of the mesh, we retrieve the indices of its vertices , and we store them in a vector data structure
+        // for each face of the mesh, we retrieve also vertex's neighbours
         for(GLuint i = 0; i < mesh->mNumFaces; i++)
         {
             aiFace face = mesh->mFaces[i];
             for(GLuint j = 0; j < face.mNumIndices; j++)
+            {
                 indices.push_back(face.mIndices[j]);
+
+                // check if the position is a new one
+                if (Nmap.find(vertices[face.mIndices[j]].Position) == Nmap.end())
+                {
+                    Nmap[vertices[face.mIndices[j]].Position] = vector<GLuint>();
+                }
+
+                // add neighbours indices to current position
+                // neighbours are stored like couples of each face (ex: {1, 2, 2, 3, 3, 4, 4, 1})
+                for(GLuint k = (j + 1) % face.mNumIndices; k != j; k = (k + 1) % face.mNumIndices)
+                {
+                    Nmap[vertices[face.mIndices[j]].Position].push_back(face.mIndices[k]);
+                }
+
+                /*
+                // new vertex explored
+                if (Nmap.find(indexV) == Nmap.end())
+                {
+                    if (Vmap.find(vertices[indexV].Position) == Vmap.end())
+                    {
+                        // key not present
+                        Nmap[indexV] = set<GLuint>();
+                    }
+                    else
+                    {
+                        // add key and copy already known neighbours
+                        Nmap[indexV] = Nmap[*Vmap[vertices[indexV].Position].begin()];
+                    }
+                }
+
+                // check vertex index
+                if (Vmap.find(vertices[indexV].Position) == Vmap.end())
+                {
+                    // key not present
+                    Vmap[vertices[indexV].Position] = indexV;
+                }
+                else
+                {
+                    // get already saved index
+                    indexV = Vmap[vertices[indexV].Position];
+                }
+
+                // other face indices added as current index neighbours
+                for(GLuint k = (j + 1) % face.mNumIndices; k != j; k = (k + 1) % face.mNumIndices)
+                {
+                    int indexN = face.mIndices[k];
+
+                    // check neighbour's index
+                    if (Vmap.find(vertices[indexN].Position) != Vmap.end())
+                    {
+                        // get already saved index
+                        indexN = Vmap[vertices[indexN].Position];
+                    }
+
+                    Nmap[indexV].insert(indexN);
+                }
+                */
+            }
         }
 
+        // create neighbours vector and save neighborood data for vertices
+        vertices[0].NeighboursIndex = 0;
+        vertices[0].NeighboursNumber = Nmap[vertices[0].Position].size();
+        neighbours.insert(neighbours.end(), Nmap[vertices[0].Position].begin(), Nmap[vertices[0].Position].end());
+        for (GLuint i = 1; i < vertices.size(); i++)
+        {
+            vertices[i].NeighboursIndex = vertices[i - 1].NeighboursIndex + vertices[i - 1].NeighboursNumber;
+            vertices[i].NeighboursNumber = Nmap[vertices[i].Position].size();
+            neighbours.insert(neighbours.end(), Nmap[vertices[i].Position].begin(), Nmap[vertices[i].Position].end());
+        }
+
+        /*
+        // convert map in to a vector
+        vertices[0].NeighboursIndex = 0;
+        vertices[0].NeighboursNumber = Nmap[0].size();
+        neighbours.insert(neighbours.end(), Nmap[0].begin(), Nmap[0].end());
+        for (GLuint i = 1; i < vertices.size(); i++)
+        {
+            vertices[i].NeighboursIndex = vertices[i - 1].NeighboursIndex + vertices[i - 1].NeighboursNumber;
+            vertices[i].NeighboursNumber = Nmap[i].size();
+            neighbours.insert(neighbours.end(), Nmap[i].begin(), Nmap[i].end());
+        }
+        */
+        
         // we return an instance of the Mesh class created using the vertices and faces data structures we have created above.
-        return Mesh(vertices, indices);
+        return Mesh(vertices, indices, neighbours);
     }
 
     // setting the mesh in a cube of 1x1x1 dimensions, for consistency with the sculpting params
@@ -243,4 +348,18 @@ private:
 
         return 1 / maxExtension;
     }
+
+    struct GlmMap
+    {
+        size_t operator()(const glm::vec3& k)const
+        {
+            return std::hash<float>()(k.x) ^ std::hash<float>()(k.y) ^ std::hash<float>()(k.z);
+        }
+
+        bool operator()(const glm::vec3& a, const glm::vec3& b)const
+        {
+            return a == b;
+        }
+    };
+    
 };

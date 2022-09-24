@@ -13,7 +13,8 @@ struct Vertex
     float[2] TexCoords;
     float[3] Tangent;
     float[3] Bitangent;
-
+    uint NeighboursIndex;
+    uint NeighboursNumber;
 };
 
 struct Intersection
@@ -48,13 +49,16 @@ uniform uint IndicesNumber;
 uniform vec3 RayOrigin;
 uniform vec3 RayDirection;
 // model matrix
-uniform mat4 ModelMatrix;
+uniform mat4 InvModelMatrix;
 
 // ray-triangle intersection test
 // Möller–Trumbore intersection algorithm (from "Fast, Minimum Storage Ray/Triangle Intersection" paper by Tomas Möller and Ben Trumbore)
 // https://cadxfem.org/inf/Fast%20MinimumStorage%20RayTriangle%20Intersection.pdf
 Intersection RayTriangleIntersection(vec3 v0, vec3 v1, vec3 v2)
 {
+    vec3 ModelRayOrigin = (InvModelMatrix * vec4(RayOrigin, 1.0)).xyz;
+    vec3 ModelRayDirection = (InvModelMatrix * vec4(RayDirection, 1.0)).xyz;
+
     // small value for numerical stability in directions test -> comparison between the determinant to a small interval around zero
     float epsilon = 0.0000001;
 
@@ -68,7 +72,7 @@ Intersection RayTriangleIntersection(vec3 v0, vec3 v1, vec3 v2)
     // directions test (culling test)
     // if the dot is negative -> a direction faces the other one
     // else the directions are perpendicular or parallel but with the same direction (i.e. the ray intersects the back of the triangle)
-    if (dot(RayDirection, triangleNormal) > epsilon)
+    if (dot(ModelRayDirection, triangleNormal) > epsilon)
         return inter;
     
     // triangle edges
@@ -78,7 +82,7 @@ Intersection RayTriangleIntersection(vec3 v0, vec3 v1, vec3 v2)
     // determinant calculation
     // - to check if the ray lies on the triangle plane (culling test)
     // - to calculate u
-    vec3 h = cross(RayDirection, e2);
+    vec3 h = cross(ModelRayDirection, e2);
     float a = dot(e1, h); // determinant
     // if determinant is near zero -> ray is on the plane of the triangle
     if (a > -epsilon && a < epsilon)
@@ -87,7 +91,7 @@ Intersection RayTriangleIntersection(vec3 v0, vec3 v1, vec3 v2)
     // inverse determinant
     float f = 1.0 / a;
     // distance from vert0 to ray origin
-    vec3 s = RayOrigin - v0;
+    vec3 s = ModelRayOrigin - v0;
     // calculating u for test bounds
     float u = f * dot(s, h);
     // if u is outside the required range for the barycentric coordinate -> the interseciton point lies on the triangle plane but outside the triangle (culling test)
@@ -96,7 +100,7 @@ Intersection RayTriangleIntersection(vec3 v0, vec3 v1, vec3 v2)
 
     // calculating v for test bounds
     vec3 q = cross(s, e1);
-    float v = f * dot(RayDirection, q);
+    float v = f * dot(ModelRayDirection, q);
     // if v is outside the required range for the barycentric coordinate -> the interseciton point lies on the triangle plane but outside the triangle (culling test)
     if (v < 0.0 || u + v > 1.0)
         return inter;
@@ -110,7 +114,7 @@ Intersection RayTriangleIntersection(vec3 v0, vec3 v1, vec3 v2)
     float t = f * dot(e2, q);
     if (t > epsilon)
     {
-        vec3 intersectionPoint = RayOrigin + RayDirection * t; // world coordinates
+        vec3 intersectionPoint = ModelRayOrigin + ModelRayDirection * t; // world coordinates
 
         inter.Position[0] = intersectionPoint.x;
         inter.Position[1] = intersectionPoint.y;
@@ -138,9 +142,9 @@ void main()
     idv0 = Indices[idx];
     idv1 = Indices[idx + 1];
     idv2 = Indices[idx + 2];
-    vec3 v0 = (ModelMatrix * vec4(Vertices[idv0].Position[0], Vertices[idv0].Position[1], Vertices[idv0].Position[2], 1.0)).xyz;
-    vec3 v1 = (ModelMatrix * vec4(Vertices[idv1].Position[0], Vertices[idv1].Position[1], Vertices[idv1].Position[2], 1.0)).xyz;
-    vec3 v2 = (ModelMatrix * vec4(Vertices[idv2].Position[0], Vertices[idv2].Position[1], Vertices[idv2].Position[2], 1.0)).xyz;
+    vec3 v0 = vec3(Vertices[idv0].Position[0], Vertices[idv0].Position[1], Vertices[idv0].Position[2]);
+    vec3 v1 = vec3(Vertices[idv1].Position[0], Vertices[idv1].Position[1], Vertices[idv1].Position[2]);
+    vec3 v2 = vec3(Vertices[idv2].Position[0], Vertices[idv2].Position[1], Vertices[idv2].Position[2]);
 
     // intersection test
     Intersection inter = RayTriangleIntersection(v0, v1, v2);

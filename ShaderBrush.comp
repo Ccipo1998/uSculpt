@@ -13,7 +13,8 @@ struct Vertex
     float[2] TexCoords;
     float[3] Tangent;
     float[3] Bitangent;
-
+    uint NeighboursIndex;
+    uint NeighboursNumber;
 };
 
 struct Intersection
@@ -36,6 +37,12 @@ layout(std430, binding = 0) buffer MeshDataInput
 layout(std430, binding = 2) buffer IntersectionDataOutput
 {
     Intersection IntersectionData;
+};
+
+// vertices coordinates input
+layout(std430, binding = 3) buffer NeighboursDataInput
+{
+    uint Neighbours[];
 };
 
 /*
@@ -108,6 +115,40 @@ vec3 UniformBrush(vec3 position, vec3 normal)
     //Vertices[idx].Position = Vertices[idx].Position * 1.001;
 }
 
+vec3 GaussianBrush(vec3 position, vec3 normal)
+{
+    vec3 interPosition = vec3(IntersectionData.Position[0], IntersectionData.Position[1], IntersectionData.Position[2]);
+
+    return position + normal * GaussianDistribution(interPosition, position, Strength, Radius);;
+}
+
+vec3 SmoothNormal(vec3 position, vec3 normal, uint index, uint neighboursNumber)
+{
+    vec3 newNormal = vec3(0.0, 0.0, 0.0);
+
+    for (uint i = index; i < index + neighboursNumber - 1; i += 2)
+    {
+        uint j = Neighbours[i];
+        uint k = Neighbours[i + 1];
+        vec3 e1 = vec3(Vertices[j].Position[0], Vertices[j].Position[1], Vertices[j].Position[2]) - position;
+        vec3 e2 = vec3(Vertices[k].Position[0], Vertices[k].Position[1], Vertices[k].Position[2]) - position;
+
+        vec3 faceNormal = cross(e1, e2);
+        float angleDot = dot(e1, e2);
+        if (dot(faceNormal, normal) < 0.0)
+            faceNormal = -faceNormal;
+        
+        newNormal = newNormal + faceNormal * acos((e1 * e2) / (length(e1) * length(e2)));
+    }
+
+    // check orientation
+    float check = dot(normal, newNormal);
+    if (check < 0.0)
+        newNormal = -newNormal;
+
+    return normalize(newNormal);
+}
+
 void main()
 {
     // index
@@ -122,10 +163,20 @@ void main()
     vec3 normal = vec3(Vertices[idx].Normal[0], Vertices[idx].Normal[1], Vertices[idx].Normal[2]);
 
     //vec3 newPosition = UniformBrush(position, normal);
+    //vec3 newPosition = GaussianBrush(position);
     vec3 newPosition = GaussianBrush(position);
 
     // assignement of new values
     Vertices[idx].Position[0] = newPosition.x;
     Vertices[idx].Position[1] = newPosition.y;
     Vertices[idx].Position[2] = newPosition.z;
+
+    // we want the new positions to update the normals
+    memoryBarrierShared();
+
+    // smooth normal update
+    vec3 newNormal = SmoothNormal(newPosition, normal, Vertices[idx].NeighboursIndex, Vertices[idx].NeighboursNumber);
+    Vertices[idx].Normal[0] = newNormal.x;
+    Vertices[idx].Normal[1] = newNormal.y;
+    Vertices[idx].Normal[2] = newNormal.z;
 }

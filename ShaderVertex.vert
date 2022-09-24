@@ -37,6 +37,9 @@ layout (location = 2) in vec2 TexCoords;
 layout (location = 3) in vec3 Tangent;
 // bitangent direction in world coordinates
 layout (location = 4) in vec3 Bitangent;
+// neighbours
+layout (location = 5) in uint NeighboursIndex;
+layout (location = 6) in uint NeighboursNumber;
 
 layout(std430, binding = 2) buffer IntersectionDataOutput
 {

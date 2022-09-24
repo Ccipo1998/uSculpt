@@ -43,6 +43,10 @@ struct Vertex {
     glm::vec3 Tangent;
     // Bitangent
     glm::vec3 Bitangent;
+
+    // neighbours data
+    GLuint NeighboursIndex;
+    GLuint NeighboursNumber;
 };
 
 // different types of rendering
@@ -64,6 +68,7 @@ public:
     // data structures for vertices, and indices of vertices (for faces)
     vector<Vertex> vertices;
     vector<GLuint> indices;
+    vector<GLuint> neighbours;
     // VAO
     GLuint VAO;
 
@@ -86,6 +91,13 @@ public:
         this->setupMesh();
     }
 
+    // Constructor
+    Mesh(vector<Vertex>& vertices, vector<GLuint>& indices, vector<GLuint>& neighbours) noexcept
+        : vertices(std::move(vertices)), indices(std::move(indices)), neighbours(std::move(neighbours))
+    {
+        this->setupMesh();
+    }
+
     // We implement a user-defined move constructor and move assignment
     // see:
     // https://docs.microsoft.com/en-us/cpp/cpp/move-constructors-and-move-assignment-operators-cpp?view=vs-2019
@@ -100,7 +112,7 @@ public:
     // In our case it will no longer imply ownership of the GPU resources and its vectors will be empty.
     Mesh(Mesh&& move) noexcept
         // Calls move for both vectors, which internally consists of a simple pointer swap between the new instance and the source one.
-        : vertices(std::move(move.vertices)), indices(std::move(move.indices)),
+        : vertices(std::move(move.vertices)), indices(std::move(move.indices)), neighbours(std::move(move.neighbours)),
         VAO(move.VAO), VBO(move.VBO), EBO(move.EBO)
     {
         move.VAO = 0; // We *could* set VBO and EBO to 0 too,
@@ -117,6 +129,7 @@ public:
         {
             vertices = std::move(move.vertices);
             indices = std::move(move.indices);
+            neighbours = std::move(move.neighbours);
             VAO = move.VAO;
             VBO = move.VBO;
             EBO = move.EBO;
@@ -169,8 +182,14 @@ public:
     // bind mesh data on GPU shader buffer
     void InitMeshUpdate()
     {
+        // vertices
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this->VAO);
+        // indices
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this->EBO);
+        // neighbours
+        glGenBuffers(1, &this->NeighboursBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this->NeighboursBuffer);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(GLuint) * this->neighbours.size(), &this->neighbours[0], GL_DYNAMIC_DRAW);
 
         ResetIntersectionData();
 
@@ -195,14 +214,55 @@ public:
         // create buffer object for intersection data
         Intersection inter = {glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), false, (GLuint)-1, (GLuint)-1, (GLuint)-1};
         glGenBuffers(1, &this->IntersectionBuffer);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, IntersectionBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this->IntersectionBuffer);
         glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Intersection), &inter, GL_DYNAMIC_DRAW);
+    }
+
+    void UpdateNormals()
+    {
+        for (int i = 0; i < this->vertices.size(); i++)
+        {
+            glm::vec3 newNormal = glm::vec3(0.0f, 0.0f, 0.0f);
+            for (int j = this->vertices[i].NeighboursIndex; j < this->vertices[i].NeighboursIndex + this->vertices[i].NeighboursNumber - 1; j += 2)
+            {
+                int k = this->neighbours[j];
+                int h = this->neighbours[j + 1];
+                glm::vec3 e1 = glm::vec3(this->vertices[k].Position.x, this->vertices[k].Position.y, this->vertices[k].Position.z) - this->vertices[i].Position;
+                glm::vec3 e2 = glm::vec3(this->vertices[h].Position.x, this->vertices[h].Position.y, this->vertices[h].Position.z) - this->vertices[i].Position;
+
+                glm::vec3 faceNormal = glm::cross(e1, e2);
+                float angleDot = glm::dot(e1, e2);
+                if (glm::dot(faceNormal, this->vertices[i].Normal) < .0f)
+                    faceNormal = -faceNormal;
+
+                newNormal += faceNormal * glm::acos((e1 * e2) / (glm::length(e1) * glm::length(e2)));
+            }
+            /*
+            int k = this->neighbours[this->vertices[i].NeighboursIndex + this->vertices[i].NeighboursNumber - 1];
+            int h = this->neighbours[this->vertices[i].NeighboursIndex];
+            glm::vec3 e1 = glm::vec3(this->vertices[k].Position.x, this->vertices[k].Position.y, this->vertices[k].Position.z) - this->vertices[i].Position;
+            glm::vec3 e2 = glm::vec3(this->vertices[h].Position.x, this->vertices[h].Position.y, this->vertices[h].Position.z) - this->vertices[i].Position;
+
+            glm::vec3 faceNormal = glm::cross(e1, e2);
+            float angleDot = glm::dot(e1, e2);
+            if (glm::dot(faceNormal, this->vertices[i].Normal) < .0f)
+                faceNormal = -faceNormal;
+
+            newNormal += faceNormal; //* glm::acos((e1 * e2) / (glm::length(e1) * glm::length(e2)));
+            */
+            // check orientation before apply
+            float check = glm::dot(this->vertices[i].Normal, newNormal);
+            if (check < .0f)
+                newNormal = -newNormal;
+
+            this->vertices[i].Normal = glm::normalize(newNormal);
+        }
     }
 
 private:
 
     // VBO and EBO
-    GLuint VBO, EBO, IntersectionBuffer;
+    GLuint VBO, EBO, IntersectionBuffer, NeighboursBuffer;
 
     //////////////////////////////////////////
     // buffer objects\arrays are initialized
@@ -212,6 +272,8 @@ private:
     // http://www.informit.com/articles/article.aspx?p=1377833&seqNum=8
     void setupMesh()
     {
+        UpdateNormals();
+
         // we create the buffers
         glGenVertexArrays(1, &this->VAO);
         glGenBuffers(1, &this->VBO);
@@ -243,6 +305,11 @@ private:
         // Bitangent
         glEnableVertexAttribArray(4);
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
+        // Neighbours
+        glEnableVertexAttribArray(5);
+        glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, NeighboursIndex));
+        glEnableVertexAttribArray(6);
+        glVertexAttribPointer(6, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, NeighboursNumber));
 
         glBindVertexArray(0);
     }

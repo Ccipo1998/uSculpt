@@ -1,0 +1,2 @@
+1. Fixare intersezione quando prende due punti di intersezione
+2. Movimenti Camera

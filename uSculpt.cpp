@@ -254,7 +254,7 @@ int main()
     #pragma region MODEL INIT
 
     // loading of an initial standard sphere mesh
-    Model model("models/sphere1000k.obj");
+    Model model("models/sphere_blender.obj");
 
     // Model and Normal transformation matrices for the model
     modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);
@@ -369,6 +369,7 @@ int main()
         #pragma region INTERSECTION SHADER
 
         // intersection shader
+        // for delete intersection when the ray doesnt intersect the model
         model.meshes[0].ResetIntersectionData();
         intersectionShader.Use();
         
@@ -378,7 +379,8 @@ int main()
         glUniform1ui(glGetUniformLocation(intersectionShader.Program, "IndicesNumber"), model.meshes[0].indices.size());
 
         // model matrix for movements
-        glUniformMatrix4fv(glGetUniformLocation(intersectionShader.Program, "ModelMatrix"), 1, GL_FALSE, glm::value_ptr(modelMatrix));
+        // passing the inverse of the matrix because the approach is to inverse rotate the intersection point and normal instead of rotate the model
+        glUniformMatrix4fv(glGetUniformLocation(intersectionShader.Program, "InvModelMatrix"), 1, GL_FALSE, glm::value_ptr(glm::inverse(modelMatrix)));
 
         // camera ray data
         glUniform3fv(glGetUniformLocation(intersectionShader.Program, "RayOrigin"), 1, glm::value_ptr(camera.CameraRay.origin));
