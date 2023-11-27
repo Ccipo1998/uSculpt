@@ -5,13 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "cl.exe - Compila ed esegui il debug del file attivo",
+            "name": "Visual Studio Debugger",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/uSculpt.exe",
-            "args": ["arg1", "arg2"],
+            "program": "${workspaceFolder}/bin/Debug/usculpt.exe",
             "cwd": "${workspaceFolder}",
-            "environment": [{ "name": "config", "value": "Debug" }],
+            "console": "integratedTerminal",
+            "stopAtEntry": false
         }
     ]
 }

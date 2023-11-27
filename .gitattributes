@@ -1,2 +1,0 @@
-libs/win/*.lib filter=lfs diff=lfs merge=lfs -text
-models/statue.obj filter=lfs diff=lfs merge=lfs -text

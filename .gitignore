@@ -1,3 +1,7 @@
+
+# vscode
+.vscode/
+
 # Compiled Object files and other temp files
 *.slo
 *.lo
@@ -37,3 +41,7 @@ Icon
 libs/mac
 !libs/win/*
 libs/bullet_full/mac/*.a
+
+# build files
+build/
+bin/

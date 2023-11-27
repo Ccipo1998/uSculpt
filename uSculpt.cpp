@@ -29,10 +29,10 @@ Main Class
 #endif
 
 // glad is a loader generator for the setup of OpenGL context -> library for all OpenGL functionalities which are not provided by Microsoft libraries anymore
-#include <glad/glad.h>
+#include <glad.h>
 
 // GLFW library to create window and to manage I/O
-#include <glfw/glfw3.h>
+#include <GLFW/glfw3.h>
 
 // another check related to OpenGL loader
 // confirm that GLAD didn't include windows.h
@@ -41,10 +41,10 @@ Main Class
 #endif
 
 // classes developed during lab lectures to manage shaders, to load models, for FPS camera, and for physical simulation
-#include <utils/shader.h>
-#include <utils/model.h>
-#include <utils/camera.h>
-#include <utils/texture.h>
+#include <usculpt/shader.h>
+#include <usculpt/model.h>
+#include <usculpt/camera.h>
+//#include <usculpt/texture.h>
 
 // glm is a robust library to manage matrix and vector operations (with matrix and vector classes ready-to-use) -> use glm namespace!
 // it is not recommended to include all the glm headers with "using namespace glm" -> it can lead to many namespace clashes
@@ -55,8 +55,8 @@ Main Class
 #include <glm/gtc/type_ptr.hpp>
 
 // we include the library for images loading
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image/stb_image.h>
+// #define STB_IMAGE_IMPLEMENTATION
+// #include <stb_image/stb_image.h>
 
 // include for gui
 #include <imgui/imgui.h>
@@ -254,7 +254,7 @@ int main()
     #pragma region MODEL INIT
 
     // loading of an initial standard sphere mesh
-    Model model("models/sphere_blender.obj");
+    Model model("models/sphere1000k.obj");
 
     // Model and Normal transformation matrices for the model
     modelMatrix = glm::translate(glm::mat4(1.0f), model_pos);

@@ -241,7 +241,7 @@ void main(void)
 {
     // we call the pointer function Illumination_Model():
     // the subroutine selected in the main application will be called and executed
-    vec3 color = Illumination_Model() + hitColor;
+    vec3 color = GGX() + hitColor;
   
     FragColor = vec4(color, 1.0);
 }
